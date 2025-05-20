@@ -458,7 +458,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@RedisHash(value="StreamEvent", indexName = "StreamEventIdx")
+@IndexingOptions(indexName = "StreamEventIdx")
+@RedisHash(value="StreamEvent")
 public class StreamEvent {
 
    @Id
@@ -967,7 +968,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@RedisHash(value="StreamEvent", indexName = "StreamEventIdx")
+@IndexingOptions(indexName = "StreamEventIdx")
+@RedisHash(value="StreamEvent")
 public class StreamEvent {
 
    @Id
@@ -1319,7 +1321,7 @@ And on Redis Insight, you can see the embeddings for the text being created:
 
 ![Redis Insight Stream](readme/images/3_1_redis_insight.png)
 
-And the created index when running `FT.INFO 'com.redis.vectorembeddings.StreamEventIdx'`
+And the created index when running `FT.INFO 'StreamEventIdx'`
 
 ![Redis Insight Stream](readme/images/3_2_redis_insight.png)
 
@@ -1369,7 +1371,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@RedisHash(value="StreamEvent", indexName = "StreamEventIdx")
+@IndexingOptions(indexName = "StreamEventIdx")
+@RedisHash(value="StreamEvent")
 public class StreamEvent {
 
    @Id

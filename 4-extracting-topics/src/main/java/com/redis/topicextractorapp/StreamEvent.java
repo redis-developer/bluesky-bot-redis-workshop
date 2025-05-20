@@ -1,6 +1,7 @@
 package com.redis.topicextractorapp;
 
 import com.redis.om.spring.annotations.Indexed;
+import com.redis.om.spring.annotations.IndexingOptions;
 import com.redis.om.spring.annotations.VectorIndexed;
 import com.redis.om.spring.annotations.Vectorize;
 import com.redis.om.spring.indexing.DistanceMetric;
@@ -13,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@IndexingOptions(indexName = "StreamEventIdx")
 @RedisHash(value="StreamEvent")
 public class StreamEvent {
 
