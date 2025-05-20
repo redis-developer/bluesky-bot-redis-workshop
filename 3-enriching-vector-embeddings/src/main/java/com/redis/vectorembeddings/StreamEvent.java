@@ -1,6 +1,10 @@
-package com.redis.filteringapp;
+package com.redis.vectorembeddings;
 
 import com.redis.om.spring.annotations.Document;
+import com.redis.om.spring.annotations.Indexed;
+import com.redis.om.spring.annotations.VectorIndexed;
+import com.redis.om.spring.annotations.Vectorize;
+import com.redis.om.spring.indexing.DistanceMetric;
 import org.springframework.data.annotation.Id;
 import redis.clients.jedis.resps.StreamEntry;
 import java.util.Arrays;
@@ -16,12 +20,25 @@ public class StreamEvent {
     private String did;
     private String rkey;
     private String text;
+
+    @Vectorize(destination = "textEmbedding")
+    private String textToEmbed;
+
+    @VectorIndexed(distanceMetric = DistanceMetric.COSINE, dimension = 384)
+    private float[] textEmbedding;
+
+    @Indexed
     private Long timeUs;
     private String operation;
     private String uri;
     private String parentUri;
     private String rootUri;
+
+    @Indexed
     private List<String> langs;
+    
+    @Indexed
+    private List<String> topics;
 
     public StreamEvent(String id, String did, String rkey, String text, Long timeUs,
                       String operation, String uri, String parentUri, 
@@ -79,4 +96,17 @@ public class StreamEvent {
     public String getText() { return text; }
     public String getOperation() { return operation; }
     public String getUri() { return uri; }
+
+    // Setters
+    public void setTextToEmbed(String textToEmbed) {
+        this.textToEmbed = textToEmbed;
+    }
+
+    public void setTextEmbedding(float[] textEmbedding) {
+        this.textEmbedding = textEmbedding;
+    }
+    
+    public void setTopics(List<String> topics) {
+        this.topics = topics;
+    }
 }
