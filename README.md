@@ -432,13 +432,9 @@ For this part, you'll need the following dependencies:
 ```kotlin
 dependencies {
    implementation("org.springframework.boot:spring-boot-starter")
-   implementation("org.springframework.ai:spring-ai-starter-model-openai")
-   implementation("org.springframework.ai:spring-ai-starter-model-bedrock")
-   implementation("org.springframework.ai:spring-ai-starter-model-ollama")
 
    // Redis OM Spring
    implementation("com.redis.om:redis-om-spring:1.0.0-RC1")
-   implementation("com.redis.om:redis-om-spring-ai:1.0.0-RC1")
 
    // DJL for machine learning
    implementation("ai.djl:api:0.33.0")
@@ -455,10 +451,6 @@ First, let's create a simplified Event class to represent events from the Redis 
 package com.redis.filteringapp;
 
 import com.redis.om.spring.annotations.Document;
-import com.redis.om.spring.annotations.Indexed;
-import com.redis.om.spring.annotations.VectorIndexed;
-import com.redis.om.spring.annotations.Vectorize;
-import com.redis.om.spring.indexing.DistanceMetric;
 import org.springframework.data.annotation.Id;
 import redis.clients.jedis.resps.StreamEntry;
 import java.util.Arrays;
@@ -473,21 +465,13 @@ public class StreamEvent {
    private String id;
    private String did;
    private String rkey;
-
-   @Vectorize(destination = "textEmbedding")
    private String text;
-
-   @VectorIndexed(distanceMetric = DistanceMetric.COSINE, dimension = 384)
    private float[] textEmbedding;
-
-   @Indexed
    private Long timeUs;
    private String operation;
    private String uri;
    private String parentUri;
    private String rootUri;
-
-   @Indexed
    private List<String> langs;
 
    public StreamEvent(String id, String did, String rkey, String text, Long timeUs,

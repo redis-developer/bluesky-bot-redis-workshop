@@ -1,10 +1,6 @@
 package com.redis.filteringapp;
 
 import com.redis.om.spring.annotations.Document;
-import com.redis.om.spring.annotations.Indexed;
-import com.redis.om.spring.annotations.VectorIndexed;
-import com.redis.om.spring.annotations.Vectorize;
-import com.redis.om.spring.indexing.DistanceMetric;
 import org.springframework.data.annotation.Id;
 import redis.clients.jedis.resps.StreamEntry;
 import java.util.Arrays;
@@ -19,21 +15,12 @@ public class StreamEvent {
     private String id;
     private String did;
     private String rkey;
-
-    @Vectorize(destination = "textEmbedding")
     private String text;
-
-    @VectorIndexed(distanceMetric = DistanceMetric.COSINE, dimension = 384)
-    private float[] textEmbedding;
-
-    @Indexed
     private Long timeUs;
     private String operation;
     private String uri;
     private String parentUri;
     private String rootUri;
-
-    @Indexed
     private List<String> langs;
 
     public StreamEvent(String id, String did, String rkey, String text, Long timeUs,
@@ -89,13 +76,7 @@ public class StreamEvent {
     }
 
     // Getters
-    public String getDid() { return did; }
-    public String getRkey() { return rkey; }
     public String getText() { return text; }
-    public Long getTimeUs() { return timeUs; }
     public String getOperation() { return operation; }
     public String getUri() { return uri; }
-    public String getParentUri() { return parentUri; }
-    public String getRootUri() { return rootUri; }
-    public List<String> getLangs() { return langs; }
 }
