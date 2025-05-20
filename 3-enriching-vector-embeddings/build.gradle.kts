@@ -28,8 +28,9 @@ dependencies {
     implementation("org.springframework.ai:spring-ai-vertex-ai-embedding:1.0.0-M6")
 
     // Redis OM Spring
-    implementation("com.redis.om:redis-om-spring:1.0.0-RC1")
-    implementation("com.redis.om:redis-om-spring-ai:1.0.0-RC1")
+    implementation("com.redis.om:redis-om-spring:1.0.0-RC2")
+    implementation("com.redis.om:redis-om-spring-ai:1.0.0-RC2")
+    annotationProcessor("com.redis.om:redis-om-spring:1.0.0-RC2")
 
     // DJL for machine learning
     implementation("ai.djl:api:0.33.0")

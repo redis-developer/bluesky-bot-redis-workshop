@@ -22,7 +22,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter")
 
     // Redis OM Spring
-    implementation("com.redis.om:redis-om-spring:1.0.0-RC1")
+    implementation("com.redis.om:redis-om-spring:1.0.0-RC2")
+    annotationProcessor("com.redis.om:redis-om-spring:1.0.0-RC2")
 
     // DJL for machine learning
     implementation("ai.djl:api:0.33.0")

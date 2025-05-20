@@ -44,8 +44,8 @@ For this workshop, you'll need the following dependencies:
 ```kotlin
 dependencies {
    // Redis OM Spring
-   implementation("com.redis.om:redis-om-spring:1.0.0-RC1")
-   implementation("com.redis.om:redis-om-spring-ai:1.0.0-RC1")
+   implementation("com.redis.om:redis-om-spring:1.0.0-RC2")
+   implementation("com.redis.om:redis-om-spring-ai:1.0.0-RC2")
     
    // Spring AI with Ollama
    implementation("org.springframework.ai:spring-ai-ollama:1.0.0-RC1")
@@ -85,7 +85,7 @@ dependencies {
    implementation("org.springframework.boot:spring-boot-starter-websocket")
    
    // Redis OM Spring
-   implementation("com.redis.om:redis-om-spring:1.0.0-RC1")
+   implementation("com.redis.om:redis-om-spring:1.0.0-RC2")
 }
 ```
 
@@ -434,7 +434,7 @@ dependencies {
    implementation("org.springframework.boot:spring-boot-starter")
 
    // Redis OM Spring
-   implementation("com.redis.om:redis-om-spring:1.0.0-RC1")
+   implementation("com.redis.om:redis-om-spring:1.0.0-RC2")
 
    // DJL for machine learning
    implementation("ai.djl:api:0.33.0")
@@ -931,7 +931,7 @@ dependencies {
     implementation("org.springframework.ai:spring-ai-vertex-ai-embedding")
 
     // Redis OM Spring
-    implementation("com.redis.om:redis-om-spring:1.0.0-RC1")
+    implementation("com.redis.om:redis-om-spring:1.0.0-RC2")
     implementation("com.redis.om:redis-om-spring-ai:1.0.0-RC1")
 
     // DJL for machine learning
@@ -1340,8 +1340,8 @@ dependencies {
     implementation("org.springframework.ai:spring-ai-vertex-ai-embedding")
 
     // Redis OM Spring
-    implementation("com.redis.om:redis-om-spring:1.0.0-RC1")
-    implementation("com.redis.om:redis-om-spring-ai:1.0.0-RC1")
+    implementation("com.redis.om:redis-om-spring:1.0.0-RC2")
+    implementation("com.redis.om:redis-om-spring-ai:1.0.0-RC2")
 
     // DJL for machine learning
     implementation("ai.djl:api:0.33.0")
