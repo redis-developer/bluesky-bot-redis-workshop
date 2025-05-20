@@ -450,7 +450,7 @@ First, let's create a simplified Event class to represent events from the Redis 
 ```java
 package com.redis.filteringapp;
 
-import com.redis.om.spring.annotations.Document;
+import com.redis.om.spring.annotations.RedisHash;
 import org.springframework.data.annotation.Id;
 import redis.clients.jedis.resps.StreamEntry;
 import java.util.Arrays;
@@ -458,7 +458,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@Document(value="StreamEvent", indexName = "StreamEventIdx")
+@RedisHash(value="StreamEvent", indexName = "StreamEventIdx")
 public class StreamEvent {
 
    @Id
@@ -466,7 +466,7 @@ public class StreamEvent {
    private String did;
    private String rkey;
    private String text;
-   private float[] textEmbedding;
+   private byte[] textEmbedding;
    private Long timeUs;
    private String operation;
    private String uri;
@@ -545,9 +545,9 @@ Next, let's create a repository for the StreamEvent class:
 ```java
 package com.redis.filteringapp;
 
-import com.redis.om.spring.repository.RedisDocumentRepository;
+import com.redis.om.spring.repository.RedisEnhancedRepository;
 
-public interface StreamEventRepository extends RedisDocumentRepository<StreamEvent, String> {
+public interface StreamEventRepository extends RedisEnhancedRepository<StreamEvent, String> {
 }
 ```
 
@@ -758,7 +758,7 @@ Now, let's create a main class to run our filtering application:
 
 ```java
 package com.redis.filteringapp;
-import com.redis.om.spring.annotations.EnableRedisDocumentRepositories;
+import com.redis.om.spring.annotations.EnableRedisEnhancedRepositories;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -773,7 +773,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@EnableRedisDocumentRepositories
+@EnableRedisEnhancedRepositories
 @SpringBootApplication
 public class Application {
 
@@ -954,19 +954,20 @@ FT.DROPINDEX 'StreamEventIdx'
 ```java
 package com.redis.vectorembeddings;
 
-import com.redis.om.spring.annotations.Document;
+import com.redis.om.spring.annotations.RedisHash;
 import com.redis.om.spring.annotations.Indexed;
 import com.redis.om.spring.annotations.VectorIndexed;
 import com.redis.om.spring.annotations.Vectorize;
 import com.redis.om.spring.indexing.DistanceMetric;
 import org.springframework.data.annotation.Id;
 import redis.clients.jedis.resps.StreamEntry;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@Document(value="StreamEvent", indexName = "StreamEventIdx")
+@RedisHash(value="StreamEvent", indexName = "StreamEventIdx")
 public class StreamEvent {
 
    @Id
@@ -979,7 +980,7 @@ public class StreamEvent {
    private String textToEmbed;
 
    @VectorIndexed(distanceMetric = DistanceMetric.COSINE, dimension = 384)
-   private float[] textEmbedding;
+   private byte[] textEmbedding;
 
    @Indexed
    private Long timeUs;
@@ -1047,16 +1048,26 @@ public class StreamEvent {
    }
 
    // Getters
+   public String getId() { return id; }
    public String getText() { return text; }
    public String getOperation() { return operation; }
    public String getUri() { return uri; }
+   public String getDid() {return did;}
+   public String getRkey() {return rkey;}
+   public String getTextToEmbed() {return textToEmbed;}
+   public byte[] getTextEmbedding() {return textEmbedding;}
+   public Long getTimeUs() {return timeUs;}
+   public String getParentUri() {return parentUri;}
+   public String getRootUri() {return rootUri;}
+   public List<String> getLangs() {return langs;}
+   public List<String> getTopics() {return topics;}
 
    // Setters
    public void setTextToEmbed(String textToEmbed) {
       this.textToEmbed = textToEmbed;
    }
 
-   public void setTextEmbedding(float[] textEmbedding) {
+   public void setTextEmbedding(byte[] textEmbedding) {
       this.textEmbedding = textEmbedding;
    }
 
@@ -1070,9 +1081,9 @@ public class StreamEvent {
 ```java
 package com.redis.filteringapp;
 
-import com.redis.om.spring.repository.RedisDocumentRepository;
+import com.redis.om.spring.repository.RedisEnhancedRepository;
 
-public interface StreamEventRepository extends RedisDocumentRepository<StreamEvent, String> {
+public interface StreamEventRepository extends RedisEnhancedRepository<StreamEvent, String> {
 }
 ```
 
@@ -1178,7 +1189,7 @@ public class BloomFilterService {
 ```java
 package com.redis.vectorembeddings;
 
-import com.redis.om.spring.annotations.EnableRedisDocumentRepositories;
+import com.redis.om.spring.annotations.EnableRedisEnhancedRepositories;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -1193,7 +1204,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@EnableRedisDocumentRepositories
+@EnableRedisEnhancedRepositories
 @SpringBootApplication
 public class Application {
 
@@ -1308,13 +1319,636 @@ And on Redis Insight, you can see the embeddings for the text being created:
 
 ![Redis Insight Stream](readme/images/3_1_redis_insight.png)
 
-And the created index when running "FT.INFO 'StreamEventIdx'"
+And the created index when running `FT.INFO 'com.redis.vectorembeddings.StreamEventIdx'`
 
 ![Redis Insight Stream](readme/images/3_2_redis_insight.png)
 
+## Part 4: Extracting topics with Ollama
+
+In this section, we'll enrich the events with topic modeling. We'll use Ollama to extract topics from each post. Then, we'll store these topics in their respective posts in Redis. 
 
 
+### Required Dependencies
+```kotlin
+dependencies {
+    implementation("org.springframework.boot:spring-boot-starter")
+    implementation("org.springframework.ai:spring-ai-transformers")
+    implementation("org.springframework.ai:spring-ai-openai")
+    implementation("org.springframework.ai:spring-ai-bedrock")
+    implementation("org.springframework.ai:spring-ai-ollama")
+    implementation("org.springframework.ai:spring-ai-azure-openai")
+    implementation("org.springframework.ai:spring-ai-vertex-ai-embedding")
+
+    // Redis OM Spring
+    implementation("com.redis.om:redis-om-spring:1.0.0-RC1")
+    implementation("com.redis.om:redis-om-spring-ai:1.0.0-RC1")
+
+    // DJL for machine learning
+    implementation("ai.djl:api:0.33.0")
+    implementation("ai.djl.huggingface:tokenizers:0.33.0")
+    implementation("ai.djl.pytorch:pytorch-engine:0.33.0")
+    implementation("ai.djl.spring:djl-spring-boot-starter-autoconfigure:0.26")
+    implementation("ai.djl.spring:djl-spring-boot-starter-pytorch-auto:0.26")
+}
+```
+
+### Modeling the Stream Event with extra annotations for indexing and filtering
+```java
+package com.redis.topicextractorapp;
+
+import com.redis.om.spring.annotations.RedisHash;
+import com.redis.om.spring.annotations.Indexed;
+import com.redis.om.spring.annotations.VectorIndexed;
+import com.redis.om.spring.annotations.Vectorize;
+import com.redis.om.spring.indexing.DistanceMetric;
+import org.springframework.data.annotation.Id;
+import redis.clients.jedis.resps.StreamEntry;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@RedisHash(value="StreamEvent", indexName = "StreamEventIdx")
+public class StreamEvent {
+
+   @Id
+   private String id;
+   private String did;
+   private String rkey;
+   private String text;
+
+   @Vectorize(destination = "textEmbedding")
+   private String textToEmbed;
+
+   @VectorIndexed(distanceMetric = DistanceMetric.COSINE, dimension = 384)
+   private byte[] textEmbedding;
+
+   @Indexed
+   private Long timeUs;
+   private String operation;
+   private String uri;
+   private String parentUri;
+   private String rootUri;
+
+   @Indexed
+   private List<String> langs;
+
+   @Indexed
+   private List<String> topics;
+
+   public StreamEvent(String id, String did, String rkey, String text, Long timeUs,
+                      String operation, String uri, String parentUri,
+                      String rootUri, List<String> langs) {
+      this.id = id;
+      this.did = did;
+      this.rkey = rkey;
+      this.text = text;
+      this.timeUs = timeUs;
+      this.operation = operation;
+      this.uri = uri;
+      this.parentUri = parentUri;
+      this.rootUri = rootUri;
+      this.langs = langs;
+   }
+
+   public static StreamEvent fromStreamEntry(StreamEntry entry) {
+      Map<String, String> fields = entry.getFields();
+
+      String langsStr = fields.getOrDefault("langs", "[]");
+      List<String> langs = Arrays.asList(
+              langsStr.replace("[", "").replace("]", "").split(", ")
+      );
+
+      return new StreamEvent(
+              fields.getOrDefault("uri", ""), // ID
+              fields.getOrDefault("did", ""),
+              fields.getOrDefault("rkey", ""),
+              fields.getOrDefault("text", ""),
+              Long.parseLong(fields.getOrDefault("timeUs", "0")),
+              fields.getOrDefault("operation", ""),
+              fields.getOrDefault("uri", ""),
+              fields.getOrDefault("parentUri", ""),
+              fields.getOrDefault("rootUri", ""),
+              langs
+      );
+   }
+
+   // Convert to Map for Redis Stream
+   public Map<String, String> toMap() {
+      Map<String, String> map = new HashMap<>();
+      map.put("did", this.did);
+      map.put("rkey", this.rkey);
+      map.put("text", this.text);
+      map.put("timeUs", this.timeUs.toString());
+      map.put("operation", this.operation);
+      map.put("uri", this.uri);
+      map.put("parentUri", this.parentUri);
+      map.put("rootUri", this.rootUri);
+      map.put("langs", this.langs.toString());
+      return map;
+   }
+
+   // Getters
+   public String getId() { return id; }
+   public String getText() { return text; }
+   public String getOperation() { return operation; }
+   public String getUri() { return uri; }
+   public String getDid() {return did;}
+   public String getRkey() {return rkey;}
+   public String getTextToEmbed() {return textToEmbed;}
+   public byte[] getTextEmbedding() {return textEmbedding;}
+   public Long getTimeUs() {return timeUs;}
+   public String getParentUri() {return parentUri;}
+   public String getRootUri() {return rootUri;}
+   public List<String> getLangs() {return langs;}
+   public List<String> getTopics() {return topics;}
+
+   // Setters
+   public void setTextToEmbed(String textToEmbed) {
+      this.textToEmbed = textToEmbed;
+   }
+
+   public void setTextEmbedding(byte[] textEmbedding) {
+      this.textEmbedding = textEmbedding;
+   }
+
+   public void setTopics(List<String> topics) {
+      this.topics = topics;
+   }
+}
+```
+
+### Creating a Stream Event Repository
+```java
+package com.redis.topicextractorapp;
+
+import com.redis.om.spring.repository.RedisEnhancedRepository;
+
+public interface StreamEventRepository extends RedisEnhancedRepository<StreamEvent, String> {
+}
+```
 
 
+### Create a Redis Stream Service for consuming the filtered events stream
+
+```java
+package com.redis.topicextractorapp;
+
+import org.springframework.stereotype.Service;
+import redis.clients.jedis.JedisPooled;
+import redis.clients.jedis.StreamEntryID;
+import redis.clients.jedis.exceptions.JedisDataException;
+import redis.clients.jedis.params.XAddParams;
+import redis.clients.jedis.params.XReadGroupParams;
+import redis.clients.jedis.resps.StreamEntry;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class RedisStreamService {
+
+    private final JedisPooled jedisPooled;
+
+    public RedisStreamService(JedisPooled jedisPooled) {
+        this.jedisPooled = jedisPooled;
+    }
+
+    public void acknowledgeMessage(
+            String streamName,
+            String consumerGroup,
+            StreamEntry entry) {
+        jedisPooled.xack(streamName, consumerGroup, entry.getID());
+    }
+
+    public void createConsumerGroup(String streamName, String consumerGroupName) {
+        try {
+            jedisPooled.xgroupCreate(streamName, consumerGroupName, new StreamEntryID("0-0"), true);
+        } catch (JedisDataException e) {
+            System.out.println("Group already exists");
+        }
+    }
+
+    public List<Map.Entry<String, List<StreamEntry>>> readFromStream(
+            String streamName, String consumerGroup, String consumer, int count) {
+
+        Map<String, StreamEntryID> streams = new HashMap<>();
+        streams.put(streamName, StreamEntryID.XREADGROUP_UNDELIVERED_ENTRY);
+
+        List<Map.Entry<String, List<StreamEntry>>> entries = jedisPooled.xreadGroup(
+                consumerGroup,
+                consumer,
+                XReadGroupParams.xReadGroupParams().count(count),
+                streams
+        );
+
+        return entries != null ? entries : Collections.emptyList();
+    }
+}
+```
+
+### Create a Bloom Filter Service for deduplication
+
+```java
+package com.redis.topicextractorapp;
+
+import com.redis.om.spring.ops.pds.BloomOperations;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import redis.clients.jedis.exceptions.JedisDataException;
+
+@Service
+public class BloomFilterService {
+   private final Logger logger = LoggerFactory.getLogger(BloomFilterService.class);
+   private final BloomOperations<String> opsForBloom;
+
+   public BloomFilterService(BloomOperations<String> opsForBloom) {
+      this.opsForBloom = opsForBloom;
+   }
+
+   public void createBloomFilter(String name) {
+      try {
+         opsForBloom.createFilter(name, 1_000_000L, 0.01);
+      } catch(JedisDataException e) {
+         logger.info("Bloom filter {} already exists", name);
+      }
+   }
+
+   public boolean isInBloomFilter(String bloomFilter, String value) {
+      return opsForBloom.exists(bloomFilter, value);
+   }
+
+   public void addToBloomFilter(String bloomFilter, String value) {
+      opsForBloom.add(bloomFilter, value);
+   }
+}
+```
+
+### Create a Count-min Sketch Service for counting the frequency of topics
+
+```java
+package com.redis.topicextractorapp;
+
+import com.redis.om.spring.ops.pds.CountMinSketchOperations;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import redis.clients.jedis.exceptions.JedisDataException;
+
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class CountMinSketchService {
+    private final Logger logger = LoggerFactory.getLogger(CountMinSketchService.class);
+    private final CountMinSketchOperations<String> opsForCms;
+
+    public CountMinSketchService(CountMinSketchOperations<String> opsForCms) {
+        this.opsForCms = opsForCms;
+    }
+
+    public void create(String name) {
+        try {
+            opsForCms.cmsInitByDim(name, 3000, 10);
+        } catch(JedisDataException e) {
+            logger.info("Count-min Sketch {} already exists", name);
+        }
+    }
+
+    public List<Long> incrBy(String countMinSketchName, String value, long count) {
+        return opsForCms.cmsIncrBy(countMinSketchName, Map.of(value, count));
+    }
+
+    public List<Long> incrBy(String countMinSketchName, Map<String, Long> counters) {
+        return opsForCms.cmsIncrBy(countMinSketchName, counters);
+    }
+
+    public Long query(String countMinSketchName, String value) {
+        return opsForCms.cmsQuery(countMinSketchName, value).stream().findFirst().orElse(0L);
+    }
+}
+```
+
+### Setup a Ollama Chat Model Bean
+
+```java
+@Bean
+public ChatModel chatModel() {
+   OllamaApi ollamaApi = new OllamaApi("http://localhost:11434");
+
+   OllamaOptions ollamaOptions = OllamaOptions.builder()
+           .model("deepseek-coder-v2")
+           .build();
+
+   return OllamaChatModel.builder()
+           .ollamaApi(ollamaApi)
+           .defaultOptions(ollamaOptions)
+           .build();
+}
+```
+
+### Create a service for extracting topics
+
+```java
+package com.redis.topicextractorapp;
+
+import com.redis.om.spring.annotations.EnableRedisEnhancedRepositories;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ai.ollama.OllamaChatModel;
+import org.springframework.ai.ollama.api.OllamaApi;
+import org.springframework.ai.ollama.api.OllamaOptions;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import redis.clients.jedis.JedisPooled;
+import redis.clients.jedis.resps.StreamEntry;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+@EnableRedisEnhancedRepositories
+@SpringBootApplication
+public class Application {
+
+    private static final Logger logger = LoggerFactory.getLogger(Application.class);
+
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
+
+    @Bean
+    public JedisPooled jedisPooled() {
+        return new JedisPooled();
+    }
+
+    @Bean
+    public OllamaChatModel chatModel() {
+        OllamaApi ollamaApi = new OllamaApi("http://localhost:11434");
+
+        OllamaOptions ollamaOptions = OllamaOptions.builder()
+                .model("deepseek-coder-v2")
+                .build();
+
+        return OllamaChatModel.builder()
+                .ollamaApi(ollamaApi)
+                .defaultOptions(ollamaOptions)
+                .build();
+    }
+
+    @Bean
+    public CommandLineRunner runFilteringPipeline(
+            RedisStreamService redisStreamService,
+            BloomFilterService bloomFilterService,
+            StreamEventRepository streamEventRepository,
+            TopicExtractionService topicExtractionService,
+            CountMinSketchService countMinSketchService) {
+        return args -> {
+            String streamName = "filtered-events";
+            String consumerGroup = "topic-extraction-group";
+            String bloomFilterName = "topic-extraction-dedup-bf";
+
+            redisStreamService.createConsumerGroup(streamName, consumerGroup);
+            bloomFilterService.createBloomFilter(bloomFilterName);
+
+            int numConsumers = 4;
+
+            ExecutorService executorService = Executors.newFixedThreadPool(numConsumers);
+            for (int i = 0; i < numConsumers; i++) {
+                final String consumerName = "consumer-" + i;
+                executorService.submit(() -> consumeStream(
+                        streamName,
+                        consumerGroup,
+                        consumerName,
+                        bloomFilterName,
+                        streamEventRepository,
+                        redisStreamService,
+                        bloomFilterService,
+                        countMinSketchService,
+                        topicExtractionService
+                ));
+            }
+        };
+    }
+
+
+    private void consumeStream(
+            String streamName,
+            String consumerGroup,
+            String consumer,
+            String bloomFilterName,
+            StreamEventRepository streamEventRepository,
+            RedisStreamService redisStreamService,
+            BloomFilterService bloomFilterService,
+            CountMinSketchService countMinSketchService,
+            TopicExtractionService topicExtractionService
+    ) {
+        while (!Thread.currentThread().isInterrupted()) {
+            List<Map.Entry<String, List<StreamEntry>>> entries = redisStreamService.readFromStream(
+                    streamName, consumerGroup, consumer, 5);
+
+            String cmsKeySpace = "topics-cms:";
+            String cmsKey = cmsKeySpace + LocalDateTime.now().withMinute(0).withNano(0);
+            countMinSketchService.create(cmsKey);
+
+            for (Map.Entry<String, List<StreamEntry>> streamEntries : entries) {
+                for (StreamEntry entry : streamEntries.getValue()) {
+                    StreamEvent event = StreamEvent.fromStreamEntry(entry);
+
+                    // Process the event through our pipeline
+                    if (processEvent(
+                            event,
+                            bloomFilterName,
+                            bloomFilterService
+                    )) {
+                        logger.info("Filtered event: {}", event.getUri());
+                        List<String> topics = topicExtractionService.processTopics(event);
+
+                        Map<String, Long> counts = new HashMap<>();
+                        for (String topic : topics) {
+                            counts.put(topic, 1L);
+                        }
+                        countMinSketchService.incrBy(cmsKey, counts);
+
+                        event.setTopics(topics);
+                        streamEventRepository.updateField(event, StreamEvent$.TOPICS, topics);
+                    }
+
+                    // Acknowledge the message
+                    redisStreamService.acknowledgeMessage(streamName, consumerGroup, entry);
+                    // Add to bloom filter for deduplication
+
+                    bloomFilterService.addToBloomFilter(bloomFilterName, event.getUri());
+                }
+            }
+        }
+    }
+
+    private boolean processEvent(
+            StreamEvent event,
+            String bloomFilterName,
+            BloomFilterService bloomFilterService
+    ) {
+        // Skip if already processed (deduplication)
+        if (bloomFilterService.isInBloomFilter(bloomFilterName, event.getUri())) {
+            logger.info("Event already processed: {}", event.getUri());
+            return false;
+        }
+
+        logger.info("Extracting topics for event: {}", event.getUri());
+        return true;
+    }
+}
+```
+
+### Read from the stream, process the events, and update them with vector embeddings
+```java
+package com.redis.topicextractorapp;
+
+import com.redis.om.spring.annotations.EnableRedisEnhancedRepositories;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import redis.clients.jedis.JedisPooled;
+import redis.clients.jedis.resps.StreamEntry;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+@EnableRedisEnhancedRepositories
+@SpringBootApplication
+public class Application {
+
+    private static final Logger logger = LoggerFactory.getLogger(Application.class);
+
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
+
+    @Bean
+    public JedisPooled jedisPooled() {
+        return new JedisPooled();
+    }
+
+    @Bean
+    public CommandLineRunner runFilteringPipeline(
+            RedisStreamService redisStreamService,
+            BloomFilterService bloomFilterService,
+            StreamEventRepository streamEventRepository
+    ) {
+        return args -> {
+            String streamName = "filtered-events";
+            String consumerGroup = "embeddings-group";
+            String bloomFilterName = "embeddings-dedup-bf";
+
+            redisStreamService.createConsumerGroup(streamName, consumerGroup);
+            bloomFilterService.createBloomFilter(bloomFilterName);
+
+            int numConsumers = 4;
+
+            ExecutorService executorService = Executors.newFixedThreadPool(numConsumers);
+            for (int i = 0; i < numConsumers; i++) {
+                final String consumerName = "consumer-" + i;
+                executorService.submit(() -> consumeStream(
+                        streamName,
+                        consumerGroup,
+                        consumerName,
+                        bloomFilterName,
+                        streamEventRepository,
+                        redisStreamService,
+                        bloomFilterService
+                ));
+            }
+        };
+    }
+
+    private void consumeStream(
+            String streamName,
+            String consumerGroup,
+            String consumer,
+            String bloomFilterName,
+            StreamEventRepository streamEventRepository,
+            RedisStreamService redisStreamService,
+            BloomFilterService bloomFilterService
+    ) {
+        while (!Thread.currentThread().isInterrupted()) {
+            List<Map.Entry<String, List<StreamEntry>>> entries = redisStreamService.readFromStream(
+                    streamName, consumerGroup, consumer, 5);
+
+            for (Map.Entry<String, List<StreamEntry>> streamEntries : entries) {
+                for (StreamEntry entry : streamEntries.getValue()) {
+                    StreamEvent event = StreamEvent.fromStreamEntry(entry);
+
+                    // Process the event through our pipeline
+                    if (processEvent(
+                            event,
+                            bloomFilterName,
+                            bloomFilterService
+                    )) {
+                        logger.info("Filtered event: {}", event.getUri());
+                        // Saving the event will create the embedding under the hood for us
+                        event.setTextToEmbed(event.getText());
+                        streamEventRepository.save(event);
+                    }
+
+                    // Acknowledge the message
+                    redisStreamService.acknowledgeMessage(streamName, consumerGroup, entry);
+                    // Add to bloom filter for deduplication
+
+                    bloomFilterService.addToBloomFilter(bloomFilterName, event.getUri());
+                }
+            }
+        }
+    }
+
+    private boolean processEvent(
+            StreamEvent event,
+            String bloomFilterName,
+            BloomFilterService bloomFilterService
+    ) {
+        // Skip if already processed (deduplication)
+        if (bloomFilterService.isInBloomFilter(bloomFilterName, event.getUri())) {
+            logger.info("Event already processed: {}", event.getUri());
+            return false;
+        }
+
+        logger.info("Creating embed for event: {}", event.getUri());
+        return true;
+    }
+}
+```
+
+When running the application, you see logs similar to the ones below:
+
+```bash
+2025-05-20T21:25:46.741+02:00  INFO 72537 --- [4-extracting-topics] [           main] c.redis.topicextractorapp.Application    : Started Application in 1.337 seconds (process running for 1.594)
+2025-05-20T21:25:46.748+02:00  INFO 72537 --- [4-extracting-topics] [pool-4-thread-3] c.redis.topicextractorapp.Application    : Extracting topics for event: at://did:plc:gaxwkjacweav5dvmtm6fn2zj/app.bsky.feed.post/3lpmsodafuc2z
+2025-05-20T21:25:46.748+02:00  INFO 72537 --- [4-extracting-topics] [pool-4-thread-3] c.redis.topicextractorapp.Application    : Filtered event: at://did:plc:gaxwkjacweav5dvmtm6fn2zj/app.bsky.feed.post/3lpmsodafuc2z
+2025-05-20T21:25:46.749+02:00  INFO 72537 --- [4-extracting-topics] [pool-4-thread-2] c.r.t.CountMinSketchService              : Count-min Sketch topics-cms:2025-05-20T21:00:46 already exists
+2025-05-20T21:25:46.749+02:00  INFO 72537 --- [4-extracting-topics] [pool-4-thread-4] c.r.t.CountMinSketchService              : Count-min Sketch topics-cms:2025-05-20T21:00:46 already exists
+2025-05-20T21:25:46.749+02:00  INFO 72537 --- [4-extracting-topics] [pool-4-thread-1] c.r.t.CountMinSketchService              : Count-min Sketch topics-cms:2025-05-20T21:00:46 already exists
+2025-05-20T21:25:46.749+02:00  INFO 72537 --- [4-extracting-topics] [pool-4-thread-2] c.redis.topicextractorapp.Application    : Extracting topics for event: at://did:plc:4hm6gb7dzobynqrpypif3dck/app.bsky.feed.post/3lpmsogcnyk2m
+2025-05-20T21:25:46.750+02:00  INFO 72537 --- [4-extracting-topics] [pool-4-thread-2] c.redis.topicextractorapp.Application    : Filtered event: at://did:plc:4hm6gb7dzobynqrpypif3dck/app.bsky.feed.post/3lpmsogcnyk2m
+2025-05-20T21:25:46.750+02:00  INFO 72537 --- [4-extracting-topics] [pool-4-thread-4] c.redis.topicextractorapp.Application    : Extracting topics for event: at://did:plc:4hm6gb7dzobynqrpypif3dck/app.bsky.feed.post/3lpmsofr2xv2g
+2025-05-20T21:25:46.750+02:00  INFO 72537 --- [4-extracting-topics] [pool-4-thread-4] c.redis.topicextractorapp.Application    :
+```
+
+And on Redis Insight, you can see the topics for the text being created:
+
+![Redis Insight Stream](readme/images/4_1_redis_insight.png)
 
 

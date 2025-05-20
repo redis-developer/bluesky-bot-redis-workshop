@@ -1,4 +1,4 @@
-package com.redis.vectorembeddings;
+package com.redis.topicextractorapp;
 
 import com.redis.om.spring.annotations.Indexed;
 import com.redis.om.spring.annotations.VectorIndexed;
@@ -37,13 +37,13 @@ public class StreamEvent {
 
     @Indexed
     private List<String> langs;
-
+    
     @Indexed
     private List<String> topics;
 
     public StreamEvent(String id, String did, String rkey, String text, Long timeUs,
-                       String operation, String uri, String parentUri,
-                       String rootUri, List<String> langs) {
+                      String operation, String uri, String parentUri, 
+                      String rootUri, List<String> langs) {
         this.id = id;
         this.did = did;
         this.rkey = rkey;
@@ -61,7 +61,7 @@ public class StreamEvent {
 
         String langsStr = fields.getOrDefault("langs", "[]");
         List<String> langs = Arrays.asList(
-                langsStr.replace("[", "").replace("]", "").split(", ")
+            langsStr.replace("[", "").replace("]", "").split(", ")
         );
 
         return new StreamEvent(
@@ -116,7 +116,7 @@ public class StreamEvent {
     public void setTextEmbedding(byte[] textEmbedding) {
         this.textEmbedding = textEmbedding;
     }
-
+    
     public void setTopics(List<String> topics) {
         this.topics = topics;
     }

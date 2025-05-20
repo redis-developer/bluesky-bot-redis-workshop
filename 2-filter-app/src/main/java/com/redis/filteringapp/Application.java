@@ -1,5 +1,5 @@
 package com.redis.filteringapp;
-import com.redis.om.spring.annotations.EnableRedisDocumentRepositories;
+import com.redis.om.spring.annotations.EnableRedisEnhancedRepositories;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@EnableRedisDocumentRepositories
+@EnableRedisEnhancedRepositories
 @SpringBootApplication
 public class Application {
 

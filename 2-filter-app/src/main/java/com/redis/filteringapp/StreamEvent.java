@@ -1,14 +1,14 @@
 package com.redis.filteringapp;
 
-import com.redis.om.spring.annotations.Document;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.redis.core.RedisHash;
 import redis.clients.jedis.resps.StreamEntry;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@Document(value="StreamEvent", indexName = "StreamEventIdx")
+@RedisHash(value="StreamEvent")
 public class StreamEvent {
 
     @Id

@@ -1,4 +1,4 @@
-package com.redis.filteringapp;
+package com.redis.topicextractorapp;
 
 import com.redis.om.spring.repository.RedisEnhancedRepository;
 
