@@ -75,8 +75,77 @@ public class StreamEvent {
         return map;
     }
 
+
     // Getters
     public String getText() { return text; }
     public String getOperation() { return operation; }
     public String getUri() { return uri; }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getDid() {
+        return did;
+    }
+
+    public void setDid(String did) {
+        this.did = did;
+    }
+
+    public String getRkey() {
+        return rkey;
+    }
+
+    public void setRkey(String rkey) {
+        this.rkey = rkey;
+    }
+
+    public void setText(String text) {
+        this.text = text;
+    }
+
+    public Long getTimeUs() {
+        return timeUs;
+    }
+
+    public void setTimeUs(Long timeUs) {
+        this.timeUs = timeUs;
+    }
+
+    public void setOperation(String operation) {
+        this.operation = operation;
+    }
+
+    public void setUri(String uri) {
+        this.uri = uri;
+    }
+
+    public String getParentUri() {
+        return parentUri;
+    }
+
+    public void setParentUri(String parentUri) {
+        this.parentUri = parentUri;
+    }
+
+    public String getRootUri() {
+        return rootUri;
+    }
+
+    public void setRootUri(String rootUri) {
+        this.rootUri = rootUri;
+    }
+
+    public List<String> getLangs() {
+        return langs;
+    }
+
+    public void setLangs(List<String> langs) {
+        this.langs = langs;
+    }
 }
