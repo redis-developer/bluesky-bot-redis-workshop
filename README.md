@@ -22,7 +22,7 @@ To follow this workshop, you'll need:
 1. Clone the repository
 2. Start Redis Open Source 8 using Docker:
    ```bash
-   docker copose up -d
+   docker compose up -d
    ```
    This provides Redis with all the necessary modules (Redis Query Engine, RedisJSON, etc.).
 3. Install Redis Insight for visualizing the data: https://redis.io/docs/latest/operate/redisinsight/install/
