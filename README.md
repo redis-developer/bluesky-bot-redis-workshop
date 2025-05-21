@@ -22,13 +22,13 @@ To follow this workshop, you'll need:
 1. Clone the repository
 2. Start Redis Open Source 8 using Docker:
    ```bash
-   docker run --name my-redis -p 6379:6379 redis
+   docker copose up -d
    ```
    This provides Redis with all the necessary modules (Redis Query Engine, RedisJSON, etc.).
 3. Install Redis Insight for visualizing the data: https://redis.io/docs/latest/operate/redisinsight/install/
 4. Verify Redis is running:
    ```bash
-   docker exec -it my-redis redis-cli ping
+   docker exec -it redis-database redis-cli ping
    ```
    This should return "PONG".
 5. Start Ollama with the Deepseek Coder model:
