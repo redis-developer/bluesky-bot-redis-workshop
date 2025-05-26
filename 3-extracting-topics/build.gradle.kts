@@ -20,17 +20,18 @@ repositories {
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter")
 
-    implementation("org.springframework.ai:spring-ai-transformers:1.0.0-M6")
-    implementation("org.springframework.ai:spring-ai-openai:1.0.0-M6")
-    implementation("org.springframework.ai:spring-ai-bedrock:1.0.0-M6")
-    implementation("org.springframework.ai:spring-ai-ollama:1.0.0-M6")
-    implementation("org.springframework.ai:spring-ai-azure-openai:1.0.0-M6")
-    implementation("org.springframework.ai:spring-ai-vertex-ai-embedding:1.0.0-M6")
+    implementation("org.springframework.ai:spring-ai-transformers:1.0.0")
+    implementation("org.springframework.ai:spring-ai-openai:1.0.0")
+    implementation("org.springframework.ai:spring-ai-bedrock:1.0.0")
+    implementation("org.springframework.ai:spring-ai-ollama:1.0.0")
+    implementation("org.springframework.ai:spring-ai-azure-openai:1.0.0")
+    implementation("org.springframework.ai:spring-ai-vertex-ai-embedding:1.0.0")
 
     // Redis OM Spring
-    implementation("com.redis.om:redis-om-spring:1.0.0-RC2")
-    implementation("com.redis.om:redis-om-spring-ai:1.0.0-RC2")
-    annotationProcessor("com.redis.om:redis-om-spring:1.0.0-RC2")
+    implementation("com.redis.om:redis-om-spring:1.0.0-RC3")
+    implementation("com.redis.om:redis-om-spring-ai:1.0.0-RC3")
+    annotationProcessor("com.redis.om:redis-om-spring:1.0.0-RC3")
+
 
     // DJL for machine learning
     implementation("ai.djl:api:0.33.0")

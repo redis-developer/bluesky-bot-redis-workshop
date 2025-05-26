@@ -1,4 +1,4 @@
-package com.redis.vectorembeddings;
+package com.redis.topicextractorapp;
 
 import com.redis.om.spring.annotations.Indexed;
 import com.redis.om.spring.annotations.IndexingOptions;
@@ -6,6 +6,7 @@ import com.redis.om.spring.annotations.VectorIndexed;
 import com.redis.om.spring.annotations.Vectorize;
 import com.redis.om.spring.indexing.DistanceMetric;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.redis.core.RedisHash;
 import redis.clients.jedis.resps.StreamEntry;
 
@@ -39,13 +40,16 @@ public class StreamEvent {
 
     @Indexed
     private List<String> langs;
-
+    
     @Indexed
     private List<String> topics;
 
+    @Transient
+    private String redisStreamEntryId;
+
     public StreamEvent(String id, String did, String rkey, String text, Long timeUs,
-                       String operation, String uri, String parentUri,
-                       String rootUri, List<String> langs) {
+                      String operation, String uri, String parentUri, 
+                      String rootUri, List<String> langs, String redisStreamEntryId) {
         this.id = id;
         this.did = did;
         this.rkey = rkey;
@@ -56,6 +60,7 @@ public class StreamEvent {
         this.parentUri = parentUri;
         this.rootUri = rootUri;
         this.langs = langs;
+        this.redisStreamEntryId = redisStreamEntryId;
     }
 
     public static StreamEvent fromStreamEntry(StreamEntry entry) {
@@ -63,7 +68,7 @@ public class StreamEvent {
 
         String langsStr = fields.getOrDefault("langs", "[]");
         List<String> langs = Arrays.asList(
-                langsStr.replace("[", "").replace("]", "").split(", ")
+            langsStr.replace("[", "").replace("]", "").split(", ")
         );
 
         return new StreamEvent(
@@ -76,7 +81,8 @@ public class StreamEvent {
                 fields.getOrDefault("uri", ""),
                 fields.getOrDefault("parentUri", ""),
                 fields.getOrDefault("rootUri", ""),
-                langs
+                langs,
+                entry.getID().toString()
         );
     }
 
@@ -118,8 +124,12 @@ public class StreamEvent {
     public void setTextEmbedding(byte[] textEmbedding) {
         this.textEmbedding = textEmbedding;
     }
-
+    
     public void setTopics(List<String> topics) {
         this.topics = topics;
+    }
+
+    public String getRedisStreamEntryId() {
+        return redisStreamEntryId;
     }
 }

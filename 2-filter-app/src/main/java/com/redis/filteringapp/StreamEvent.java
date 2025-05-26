@@ -40,8 +40,6 @@ public class StreamEvent {
         this.parentUri = parentUri;
         this.rootUri = rootUri;
         this.langs = langs;
-
-
         this.redisStreamEntryId = redisStreamEntryId;
     }
 

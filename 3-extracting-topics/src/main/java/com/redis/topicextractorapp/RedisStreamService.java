@@ -1,5 +1,7 @@
 package com.redis.topicextractorapp;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.StreamEntryID;
@@ -15,6 +17,7 @@ import java.util.Map;
 @Service
 public class RedisStreamService {
 
+    private final static Logger logger = LoggerFactory.getLogger(RedisStreamService.class);
     private final JedisPooled jedisPooled;
 
     public RedisStreamService(JedisPooled jedisPooled) {
@@ -24,15 +27,15 @@ public class RedisStreamService {
     public void acknowledgeMessage(
             String streamName,
             String consumerGroup,
-            StreamEntry entry) {
-        jedisPooled.xack(streamName, consumerGroup, entry.getID());
+            String entryId) {
+        jedisPooled.xack(streamName, consumerGroup, new StreamEntryID(entryId));
     }
 
     public void createConsumerGroup(String streamName, String consumerGroupName) {
         try {
             jedisPooled.xgroupCreate(streamName, consumerGroupName, new StreamEntryID("0-0"), true);
         } catch (JedisDataException e) {
-            System.out.println("Group already exists");
+            logger.warn("Group already exists");
         }
     }
 
