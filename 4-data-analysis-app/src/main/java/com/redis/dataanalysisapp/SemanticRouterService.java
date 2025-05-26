@@ -1,0 +1,91 @@
+package com.redis.dataanalysisapp;
+
+import com.redis.om.spring.search.stream.EntityStream;
+import com.redis.om.spring.tuple.Fields;
+import com.redis.om.spring.tuple.Pair;
+import com.redis.om.spring.vectorize.Embedder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+@Service
+public class SemanticRouterService {
+    private static final Logger logger = LoggerFactory.getLogger(SemanticRouterService.class);
+    private final Embedder embedder;
+    private final EntityStream entityStream;
+    private final RoutingRepository repository;
+
+    public SemanticRouterService(Embedder embedder, EntityStream entityStream, RoutingRepository repository) {
+        this.embedder = embedder;
+        this.entityStream = entityStream;
+        this.repository = repository;
+    }
+
+    boolean areReferencesLoaded() {
+        return repository.count() > 0;
+    }
+
+    void loadReferences(List<String> references, String route, double maxThreshold) {
+        references.stream()
+                .map(reference -> {
+                    Routing routing = new Routing();
+                    routing.setRoute(route);
+                    routing.setMinThreshold(maxThreshold);
+                    routing.setText(reference);
+                    return routing;
+                }).forEach(repository::save);
+    }
+
+    private byte[] createEmbedding(String text) {
+        return embedder.getTextEmbeddingsAsBytes(List.of(text), Routing$.TEXT).getFirst();
+    }
+
+    private Pair<Routing, Double> vectorSimilaritySearch(byte[] embedding) {
+        return entityStream.of(Routing.class)
+                .filter(Routing$.TEXT_EMBEDDING.knn(1, embedding))
+                .sorted(Routing$._TEXT_EMBEDDING_SCORE)
+                .map(Fields.of(Routing$._THIS, Routing$._TEXT_EMBEDDING_SCORE))
+                .collect(Collectors.toList())
+                .getFirst();
+    }
+
+    public Set<String> matchRoute(String post) {
+        List<String> clauses = breakSentenceIntoClauses(post);
+
+        return clauses.stream()
+            .flatMap(clause -> {
+                byte[] embedding = createEmbedding(clause);
+                var result = vectorSimilaritySearch(embedding);
+
+                Routing routing = result.getFirst();
+                Double score = result.getSecond();
+
+                String route = routing.getRoute();
+                double maxThreshold = routing.getMinThreshold();
+
+                System.out.println("Clause: " + clause);
+                System.out.println("Route: " + route);
+                System.out.println("Score: " + score);
+                System.out.println("Max Threshold: " + maxThreshold);
+                System.out.println();
+
+                if (score < maxThreshold) {
+                    return Stream.of(route);
+                } else {
+                    return Stream.empty();
+                }
+            }).collect(Collectors.toSet());
+    }
+
+    private List<String> breakSentenceIntoClauses(String sentence) {
+        return Arrays.stream(
+            sentence.split("[!?,.:;()\"\\[\\]{}]+")
+        ).filter(s -> !s.isBlank())
+         .map(String::trim)
+         .collect(Collectors.toList());
+    }
+}

@@ -1,4 +1,4 @@
-package com.redis.topicextractorapp;
+package com.redis.dataanalysisapp;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,32 +7,46 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.ollama.OllamaChatModel;
+import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.stereotype.Service;
-
 import redis.clients.jedis.JedisPooled;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
 
 @Service
 public class TopicExtractionService {
     private static final Logger logger = LoggerFactory.getLogger(TopicExtractionService.class);
     private final JedisPooled jedis;
-    private final OllamaChatModel chatModel;
+    private final OpenAiChatModel chatModel;
 
-    public TopicExtractionService(JedisPooled jedisPooled, OllamaChatModel chatModel, TopKService topKService) {
+    public TopicExtractionService(JedisPooled jedisPooled, OpenAiChatModel chatModel) {
         this.jedis = jedisPooled;
         this.chatModel = chatModel;
     }
 
-    private List<String> extractTopics(String post) {
-        // Implement the topic extraction logic using the chat model
-        return null;
-    }
+    public List<String> extractTopics(String post) {
+        Set<String> existingTopics = jedis.smembers("topics");
+        List<Message> messages = List.of(
+                new SystemMessage(PROMPT),
+                new UserMessage("Existing topics: " + existingTopics),
+                new UserMessage("Post: " + post)
+        );
 
-    public List<String> processTopics(StreamEvent event) {
-        // Implement the logic to process topics from the event
-        return null;
+        Prompt prompt = new Prompt(messages);
+        ChatResponse response = chatModel.call(prompt);
+
+        String topics = response.getResult().getOutput().getText() != null
+                ? response.getResult().getOutput().getText()
+                : "";
+
+        return Arrays.stream(topics
+                        .replace("\"", "")
+                        .split(","))
+                .map(String::trim)
+                .filter(t -> !t.isEmpty())
+                .toList();
     }
 
     private static final String PROMPT = """

@@ -1,10 +1,15 @@
-package com.redis.filteringapp;
+package com.redis.dataanalysisapp;
 
+import com.redis.om.spring.annotations.Indexed;
 import com.redis.om.spring.annotations.IndexingOptions;
+import com.redis.om.spring.annotations.VectorIndexed;
+import com.redis.om.spring.annotations.Vectorize;
+import com.redis.om.spring.indexing.DistanceMetric;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.redis.core.RedisHash;
 import redis.clients.jedis.resps.StreamEntry;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -19,19 +24,32 @@ public class StreamEvent {
     private String did;
     private String rkey;
     private String text;
+
+    @Vectorize(destination = "textEmbedding")
+    private String textToEmbed;
+
+    @VectorIndexed(distanceMetric = DistanceMetric.COSINE, dimension = 384)
+    private byte[] textEmbedding;
+
+    @Indexed
     private Long timeUs;
     private String operation;
     private String uri;
     private String parentUri;
     private String rootUri;
+
+    @Indexed
     private List<String> langs;
+    
+    @Indexed
+    private List<String> topics;
 
     @Transient
     private String redisStreamEntryId;
 
     public StreamEvent(String id, String did, String rkey, String text, Long timeUs,
-                      String operation, String uri, String parentUri, 
-                      String rootUri, List<String> langs, String redisStreamEntryId) {
+                       String operation, String uri, String parentUri,
+                       String rootUri, List<String> langs, String redisStreamEntryId) {
         this.id = id;
         this.did = did;
         this.rkey = rkey;
@@ -83,82 +101,32 @@ public class StreamEvent {
         return map;
     }
 
-
     // Getters
+    public String getId() { return id; }
     public String getText() { return text; }
     public String getOperation() { return operation; }
     public String getUri() { return uri; }
+    public String getDid() {return did;}
+    public String getRkey() {return rkey;}
+    public String getTextToEmbed() {return textToEmbed;}
+    public byte[] getTextEmbedding() {return textEmbedding;}
+    public Long getTimeUs() {return timeUs;}
+    public String getParentUri() {return parentUri;}
+    public String getRootUri() {return rootUri;}
+    public List<String> getLangs() {return langs;}
+    public List<String> getTopics() {return topics;}
 
-    public String getId() {
-        return id;
+    // Setters
+    public void setTextToEmbed(String textToEmbed) {
+        this.textToEmbed = textToEmbed;
     }
 
-    public void setId(String id) {
-        this.id = id;
+    public void setTextEmbedding(byte[] textEmbedding) {
+        this.textEmbedding = textEmbedding;
     }
-
-    public String getDid() {
-        return did;
-    }
-
-    public void setDid(String did) {
-        this.did = did;
-    }
-
-    public String getRkey() {
-        return rkey;
-    }
-
-    public void setRkey(String rkey) {
-        this.rkey = rkey;
-    }
-
-    public void setText(String text) {
-        this.text = text;
-    }
-
-    public Long getTimeUs() {
-        return timeUs;
-    }
-
-    public void setTimeUs(Long timeUs) {
-        this.timeUs = timeUs;
-    }
-
-    public void setOperation(String operation) {
-        this.operation = operation;
-    }
-
-    public void setUri(String uri) {
-        this.uri = uri;
-    }
-
-    public String getParentUri() {
-        return parentUri;
-    }
-
-    public void setParentUri(String parentUri) {
-        this.parentUri = parentUri;
-    }
-
-    public String getRootUri() {
-        return rootUri;
-    }
-
-    public void setRootUri(String rootUri) {
-        this.rootUri = rootUri;
-    }
-
-    public List<String> getLangs() {
-        return langs;
-    }
-
-    public void setLangs(List<String> langs) {
-        this.langs = langs;
-    }
-
-    public void setRedisStreamEntryId(String redisStreamEntryId) {
-        this.redisStreamEntryId = redisStreamEntryId;
+    
+    public void setTopics(List<String> topics) {
+        this.topics = topics;
     }
 
     public String getRedisStreamEntryId() {

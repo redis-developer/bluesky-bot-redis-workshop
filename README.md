@@ -237,7 +237,7 @@ And the same events being inserted into the filtered stream:
 
 ![Redis Insight Stream](readme/images/2_2_redis_insight.png)
 
-## Part 3: Enriching Events with Vector Embeddings
+## Part 3: Enriching Events with Topics Extraction
 In this part, we'll enrich the events by extracting topics from its text. We'll use Redis as a Vector Database to store and query the embeddings.
 
 We'll use Ollama to extract topics from each post. Then, we'll store these topics in their respective posts in Redis.
@@ -271,8 +271,13 @@ public List<String> incrBy(String topKName, Map<String, Long> counters) {
 
 ```java
 @Bean
-public ChatModel chatModel() {
-   OllamaApi ollamaApi = new OllamaApi("http://localhost:11434");
+public OllamaChatModel chatModel() {
+   OllamaApi ollamaApi = OllamaApi.builder()
+           .baseUrl("http://localhost:11434")
+           .webClientBuilder(WebClient.builder())
+           .restClientBuilder(RestClient.builder())
+           .responseErrorHandler(new DefaultResponseErrorHandler())
+           .build();
 
    OllamaOptions ollamaOptions = OllamaOptions.builder()
            .model("deepseek-coder-v2")
@@ -290,20 +295,28 @@ public ChatModel chatModel() {
 In `TopicExtractorService`, we will implement the `extractTopics` method to extract topics from the posts using the Ollama Chat Model.
 
 ```java
- private String extractTopics(String post, String existingTopics) {
-     List<Message> messages = List.of(
-             new SystemMessage(PROMPT),
-             new UserMessage("Existing topics: " + existingTopics),
-             new UserMessage("Post: " + post)
-     );
+private List<String> extractTopics(String post) {
+   Set<String> existingTopics = jedis.smembers("topics");
+   List<Message> messages = List.of(
+           new SystemMessage(PROMPT),
+           new UserMessage("Existing topics: " + existingTopics),
+           new UserMessage("Post: " + post)
+   );
 
-     Prompt prompt = new Prompt(messages);
-     ChatResponse response = chatModel.call(prompt);
+   Prompt prompt = new Prompt(messages);
+   ChatResponse response = chatModel.call(prompt);
 
-     return response.getResult().getOutput().getText() != null
-             ? response.getResult().getOutput().getText()
-             : "";
- }
+   String topics = response.getResult().getOutput().getText() != null
+           ? response.getResult().getOutput().getText()
+           : "";
+
+   return Arrays.stream(topics
+                   .replace("\"", "")
+                   .split(","))
+           .map(String::trim)
+           .filter(t -> !t.isEmpty())
+           .toList();
+}
 ```
 
 We will also implement the process to store the topics in Redis.
@@ -311,23 +324,11 @@ We will also implement the process to store the topics in Redis.
 This method will read the existing topics from Redis, extract new topics from the post, and store them in a Redis Set.
 
 ```java
- public List<String> processTopics(StreamEvent event) {
-         Set<String> existingTopics = jedis.smembers("topics");
-
-         String result = extractTopics(
-                 event.getText(),
-                 String.join(", ", existingTopics)
-         );
-
-         List<String> topics = Arrays.stream(result
-                         .replace("\"", "")
-                         .split(","))
-                 .map(String::trim)
-                 .filter(t -> !t.isEmpty())
-                 .toList();
-         jedis.sadd("topics", topics.toArray(new String[0]));
-         return topics;
-     }
+public List<String> processTopics(StreamEvent event) {
+   List<String> topics = extractTopics(event.getText());
+   jedis.sadd("topics", topics.toArray(new String[0]));
+   return topics;
+}
 ```
 
 ### Updating existing posts with topics
@@ -369,5 +370,14 @@ When running the application, you see logs similar to the ones below:
 And on Redis Insight, you can see the topics for the text being created:
 
 ![Redis Insight Stream](readme/images/4_1_redis_insight.png)
+
+## Part 4: Data Analysis
+
+In this part, we'll build a question-answering system that can analyze the enriched events and answer user queries. We'll use a combination of techniques:
+
+1. Semantic routing to understand what the user is asking
+2. Trending topics analysis to identify popular topics
+3. Summarization to provide concise answers about specific topics
+
 
 
