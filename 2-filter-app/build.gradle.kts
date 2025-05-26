@@ -15,6 +15,7 @@ java {
 }
 
 repositories {
+    mavenLocal()
     mavenCentral()
 }
 
@@ -23,6 +24,7 @@ dependencies {
 
     // Redis OM Spring
     implementation("com.redis.om:redis-om-spring:1.0.0-RC2")
+    implementation("com.redis.om:redis-om-spring-ai:1.0.0-RC2")
     annotationProcessor("com.redis.om:redis-om-spring:1.0.0-RC2")
 
     // DJL for machine learning

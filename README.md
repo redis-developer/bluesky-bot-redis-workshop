@@ -98,479 +98,122 @@ And on Redis Insight, you can see the data being added to the stream:
 
 In this part, we'll filter events from the Redis Stream that we created in Part 1. We'll use a combination of techniques:
 
-1. Deduplication using Redis Bloom Filter
-2. Content-based filtering using a zero-shot classification machine learning model with Deep Java Library (DJL)
-3. Storing filtered events in Redis for further processing
+1. Content-based filtering using vector similarity search (Semantic Classification)
+2. Storing filtered events in Redis for further processing
 
-### Required Dependencies
+### Content-Based Filtering with Semantic Classification (Vector Similarity Search)
 
-For this part, you'll need the following dependencies:
+In order to filter events based on their content, we will use Redis' vector search capabilities. This allows us to perform semantic classification by comparing the content of the events against a set of predefined categories.
 
-```kotlin
-dependencies {
-   implementation("org.springframework.boot:spring-boot-starter")
+To get started, we need to come up with a set of references that we want to filter against. For this example, we'll use a simple list of references stored in a JSON file called `filtering_examples.json`.
 
-   // Redis OM Spring
-   implementation("com.redis.om:redis-om-spring:1.0.0-RC2")
+We want to vectorize each of these references and store them in Redis so that we can later compare the content of the events against these references.
 
-   // DJL for machine learning
-   implementation("ai.djl:api:0.33.0")
-   implementation("ai.djl.huggingface:tokenizers:0.33.0")
-   implementation("ai.djl.pytorch:pytorch-engine:0.33.0")
+To do so, we will:
+
+1. Annotate the `FilteringExample` class in `2-filtering-app` with the necessary Redis OM annotations for indexing and vectorization:
+
+```java
+    @Vectorize(
+            destination = "textEmbedding",
+            transformersModel = "https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/onnx/model.onnx?download=true",
+            transformersTokenizer = "https://huggingface.co/sentence-transformers/all-mpnet-base-v2/raw/main/tokenizer.json"
+    )
+    private String text;
+
+    @VectorIndexed(
+            distanceMetric = DistanceMetric.COSINE,
+            dimension = 768
+    )
+    private byte[] textEmbedding;
+```
+
+2. Then load the references from the JSON file into Redis using the `loadReferences()` method in the `FilteringExampleService` class:
+
+```java
+void loadReferences() throws IOException {
+   if (repository.count() > 0) {
+      logger.info("Filtering examples already loaded, skipping.");
+      return;
+   }
+
+   ObjectMapper objectMapper = new ObjectMapper();
+
+   Resource resource = new ClassPathResource("filtering_examples.json");
+
+   List<String> references = objectMapper.readValue(
+           resource.getInputStream(), new TypeReference<List<String>>() {}
+   );
+
+   references.stream()
+           .map(FilteringExample::new)
+           .forEach(repository::save);
 }
 ```
 
-### Modeling Redis Stream Events
-
-First, let's create a simplified Event class to represent events from the Redis Stream:
-
+3. Then, we need to implement the function that will vectorize the posts from Bluesky:
 ```java
-package com.redis.filteringapp;
-
-import com.redis.om.spring.annotations.RedisHash;
-import org.springframework.data.annotation.Id;
-import redis.clients.jedis.resps.StreamEntry;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-@IndexingOptions(indexName = "StreamEventIdx")
-@RedisHash(value="StreamEvent")
-public class StreamEvent {
-
-   @Id
-   private String id;
-   private String did;
-   private String rkey;
-   private String text;
-   private byte[] textEmbedding;
-   private Long timeUs;
-   private String operation;
-   private String uri;
-   private String parentUri;
-   private String rootUri;
-   private List<String> langs;
-
-   public StreamEvent(String id, String did, String rkey, String text, Long timeUs,
-                      String operation, String uri, String parentUri,
-                      String rootUri, List<String> langs) {
-      this.id = id;
-      this.did = did;
-      this.rkey = rkey;
-      this.text = text;
-      this.timeUs = timeUs;
-      this.operation = operation;
-      this.uri = uri;
-      this.parentUri = parentUri;
-      this.rootUri = rootUri;
-      this.langs = langs;
-   }
-
-   public static StreamEvent fromStreamEntry(StreamEntry entry) {
-      Map<String, String> fields = entry.getFields();
-
-      String langsStr = fields.getOrDefault("langs", "[]");
-      List<String> langs = Arrays.asList(
-              langsStr.replace("[", "").replace("]", "").split(", ")
-      );
-
-      return new StreamEvent(
-              fields.getOrDefault("uri", ""), // ID
-              fields.getOrDefault("did", ""),
-              fields.getOrDefault("rkey", ""),
-              fields.getOrDefault("text", ""),
-              Long.parseLong(fields.getOrDefault("timeUs", "0")),
-              fields.getOrDefault("operation", ""),
-              fields.getOrDefault("uri", ""),
-              fields.getOrDefault("parentUri", ""),
-              fields.getOrDefault("rootUri", ""),
-              langs
-      );
-   }
-
-   // Convert to Map for Redis Stream
-   public Map<String, String> toMap() {
-      Map<String, String> map = new HashMap<>();
-      map.put("did", this.did);
-      map.put("rkey", this.rkey);
-      map.put("text", this.text);
-      map.put("timeUs", this.timeUs.toString());
-      map.put("operation", this.operation);
-      map.put("uri", this.uri);
-      map.put("parentUri", this.parentUri);
-      map.put("rootUri", this.rootUri);
-      map.put("langs", this.langs.toString());
-      return map;
-   }
-
-   // Getters
-   public String getDid() { return did; }
-   public String getRkey() { return rkey; }
-   public String getText() { return text; }
-   public Long getTimeUs() { return timeUs; }
-   public String getOperation() { return operation; }
-   public String getUri() { return uri; }
-   public String getParentUri() { return parentUri; }
-   public String getRootUri() { return rootUri; }
-   public List<String> getLangs() { return langs; }
+private List<byte[]> createEmbeddings(List<String> texts) {
+  return embedder.getTextEmbeddingsAsBytes(texts, FilteringExample$.TEXT);
 }
 ```
 
-### Creating a Stream Event Repository
-Next, let's create a repository for the StreamEvent class:
-
+4. Next, we will create a method to filter events based on their content using the vector search capabilities of Redis. This method will compare the content of the event against the references and return a boolean indicating whether the event should be filtered or not.
 ```java
-package com.redis.filteringapp;
+ private boolean vectorSimilaritySearch(byte[] embedding) {
+     List<com.redis.om.spring.tuple.Pair<FilteringExample, Double>> scores = entityStream.of(FilteringExample.class)
+             .filter(FilteringExample$.TEXT_EMBEDDING.knn(1, embedding))
+             .sorted(FilteringExample$._TEXT_EMBEDDING_SCORE)
+             .map(Fields.of(FilteringExample$._THIS, FilteringExample$._TEXT_EMBEDDING_SCORE))
+             .collect(Collectors.toList());
 
-import com.redis.om.spring.repository.RedisEnhancedRepository;
-
-public interface StreamEventRepository extends RedisEnhancedRepository<StreamEvent, String> {
-}
+     return scores.stream().anyMatch(score -> score.getSecond() < 0.53);
+ }
 ```
 
 ### Reading from the Stream
-Let's create the following methods:
-- `createConsumerGroup`: Create a consumer group for the Redis Stream
-- `readFromStream`: Read events from the Redis Stream
-- `acknowledge`: Acknowledge the event after processing
-- `addToStream`: Add an event to the Redis Stream
+In order to read from a stream, we need to:
 
-Let's create a method to read from the stream as part of a consumer group:
+1. Create a consumer group for the Redis Stream
+
+In `2-filtering-app`, we have a `RedisStreamService` class that handles Redis Stream operations. In this class, implement the `createConsumerGroup` method to create a consumer group for the Redis Stream. This allows multiple consumers to read from the same stream without losing messages.
 
 ```java
-package com.redis.filteringapp;
-
-import org.springframework.stereotype.Service;
-import redis.clients.jedis.JedisPooled;
-import redis.clients.jedis.StreamEntryID;
-import redis.clients.jedis.exceptions.JedisDataException;
-import redis.clients.jedis.params.XAddParams;
-import redis.clients.jedis.params.XReadGroupParams;
-import redis.clients.jedis.resps.StreamEntry;
-
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-@Service
-public class RedisStreamService {
-
-    private final JedisPooled jedisPooled;
-
-    public RedisStreamService(JedisPooled jedisPooled) {
-        this.jedisPooled = jedisPooled;
-    }
-
-    public void addToStream(String streamName, Map<String, String> hash) {
-        jedisPooled.xadd(
-                streamName,
-                XAddParams.xAddParams()
-                        .id(StreamEntryID.NEW_ENTRY)
-                        .maxLen(1_000_000)
-                        .exactTrimming(),
-                hash
-        );
-    }
-
-    public void acknowledgeMessage(
-            String streamName,
-            String consumerGroup,
-            StreamEntry entry) {
-        jedisPooled.xack(streamName, consumerGroup, entry.getID());
-    }
-
     public void createConsumerGroup(String streamName, String consumerGroupName) {
-        try {
-            jedisPooled.xgroupCreate(streamName, consumerGroupName, new StreamEntryID("0-0"), true);
-        } catch (JedisDataException e) {
-            System.out.println("Group already exists");
-        }
-    }
+   try {
+      jedisPooled.xgroupCreate(
+              streamName, 
+              consumerGroupName, 
+              new StreamEntryID("0-0"), 
+              true
+      );
+   } catch (JedisDataException e) {
+      logger.info("Group already exists");
+   }
+}
+```
 
+Then, we need to read from the stream using the consumer group. This allows us to process messages in parallel across multiple consumers.
+
+In `RedisStreamService`, implement the `readFromStream` method to read events from the Redis Stream using the consumer group. This method will return a list of entries from the stream.
+
+```java
     public List<Map.Entry<String, List<StreamEntry>>> readFromStream(
-            String streamName, String consumerGroup, String consumer, int count) {
+        String streamName,
+        String consumerGroup,
+        String consumer,
+        int count) {
+   Map<String, StreamEntryID> streams = new HashMap<>();
+   streams.put(streamName, StreamEntryID.XREADGROUP_UNDELIVERED_ENTRY);
 
-        Map<String, StreamEntryID> streams = new HashMap<>();
-        streams.put(streamName, StreamEntryID.XREADGROUP_UNDELIVERED_ENTRY);
+   List<Map.Entry<String, List<StreamEntry>>> entries = jedisPooled.xreadGroup(
+           consumerGroup,
+           consumer,
+           XReadGroupParams.xReadGroupParams().count(count),
+           streams
+   );
 
-        List<Map.Entry<String, List<StreamEntry>>> entries = jedisPooled.xreadGroup(
-                consumerGroup,
-                consumer,
-                XReadGroupParams.xReadGroupParams().count(count),
-                streams
-        );
-
-        return entries != null ? entries : Collections.emptyList();
-    }
-}
-```
-
-### Using Redis Bloom Filter for Deduplication
-
-Let's create a BloomFilterService to create, add, and check the Bloom Filter:
-
-```java
-package com.redis.filteringapp;
-
-import com.redis.om.spring.ops.pds.BloomOperations;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import redis.clients.jedis.exceptions.JedisDataException;
-
-@Service
-public class BloomFilterService {
-    private final Logger logger = LoggerFactory.getLogger(BloomFilterService.class);
-    private final BloomOperations<String> opsForBloom;
-
-    public BloomFilterService(BloomOperations<String> opsForBloom) {
-        this.opsForBloom = opsForBloom;
-    }
-
-    public void createBloomFilter(String name) {
-        try {
-            opsForBloom.createFilter(name, 1_000_000L, 0.01);
-        } catch(JedisDataException e) {
-            logger.info("Bloom filter {} already exists", name);
-        }
-    }
-
-    public boolean isInBloomFilter(String bloomFilter, String value) {
-        return opsForBloom.exists(bloomFilter, value);
-    }
-
-    public void addToBloomFilter(String bloomFilter, String value) {
-        opsForBloom.add(bloomFilter, value);
-    }
-}
-```
-
-### Content-Based Filtering with Machine Learning
-
-Now, let's set up a zero-shot classification model to filter posts:
-
-```java
-package com.redis.filteringapp;
-
-import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer;
-import ai.djl.modality.nlp.translator.ZeroShotClassificationInput;
-import ai.djl.modality.nlp.translator.ZeroShotClassificationOutput;
-import ai.djl.repository.zoo.Criteria;
-import ai.djl.repository.zoo.ModelZoo;
-import ai.djl.inference.Predictor;
-import ai.djl.translate.TranslateException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.core.io.ResourceLoader;
-import org.springframework.stereotype.Service;
-
-import java.nio.file.Paths;
-import java.util.Arrays;
-
-@Service
-public class ContentFilterService {
-    private static final Logger logger = LoggerFactory.getLogger(ContentFilterService.class);
-    private final Predictor<ZeroShotClassificationInput, ZeroShotClassificationOutput> predictor;
-
-    public ContentFilterService(ResourceLoader resourceLoader) throws Exception {
-
-        // Load tokenizer using ResourceLoader
-        var tokenizerPath = resourceLoader.getResource(
-                "classpath:model/DeBERTa-v3-large-mnli-fever-anli-ling-wanli/tokenizer.json"
-        ).getFile().toPath();
-
-        // Load model path using ResourceLoader
-        var modelPath = resourceLoader.getResource(
-                "classpath:model/DeBERTa-v3-large-mnli-fever-anli-ling-wanli"
-        ).getFile().toPath();
-
-        // Load the tokenizer
-        HuggingFaceTokenizer tokenizer = HuggingFaceTokenizer.newInstance(tokenizerPath);
-
-        // Create a custom translator
-        CustomZeroShotClassificationTranslator translator =
-                CustomZeroShotClassificationTranslator.builder(tokenizer).build();
-
-        // Set up the criteria for loading the model
-        Criteria<ZeroShotClassificationInput, ZeroShotClassificationOutput> criteria =
-                Criteria.builder()
-                        .setTypes(ZeroShotClassificationInput.class, ZeroShotClassificationOutput.class)
-                        .optModelPath(modelPath)
-                        .optEngine("PyTorch")
-                        .optTranslator(translator)
-                        .build();
-
-        // Load the model
-        var model = ModelZoo.loadModel(criteria);
-        this.predictor = model.newPredictor();
-    }
-
-    public boolean isPoliticsRelated(String text) {
-        if (text == null || text.isBlank()) {
-            return false;
-        }
-
-        try {
-            String[] candidateLabels = new String[]{"Politics"};
-            ZeroShotClassificationInput input = new ZeroShotClassificationInput(text, candidateLabels, true);
-            ZeroShotClassificationOutput output = predictor.predict(input);
-
-            // Check if any score is above 0.90
-            return Arrays.stream(output.getScores()).anyMatch(score -> score > 0.90);
-        } catch (TranslateException e) {
-            logger.error("Error classifying text: {}", e.getMessage(), e);
-            return false;
-        }
-    }
-
-    public void close() {
-        predictor.close();
-    }
-}
-```
-
-### Putting It All Together
-Now, let's create a main class to run our filtering application:
-
-```java
-package com.redis.filteringapp;
-import com.redis.om.spring.annotations.EnableRedisEnhancedRepositories;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
-import redis.clients.jedis.JedisPooled;
-import redis.clients.jedis.resps.StreamEntry;
-
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-@EnableRedisEnhancedRepositories
-@SpringBootApplication
-public class Application {
-
-   private static final Logger logger = LoggerFactory.getLogger(Application.class);
-
-   public static void main(String[] args) {
-      SpringApplication.run(Application.class, args);
-   }
-
-   @Bean
-   public JedisPooled jedisPooled() {
-      return new JedisPooled();
-   }
-
-   @Bean
-   public CommandLineRunner runFilteringPipeline(
-           RedisStreamService redisStreamService,
-           BloomFilterService bloomFilterService,
-           ContentFilterService contentFilterService,
-           StreamEventRepository streamEventRepository
-   ) {
-      return args -> {
-         String streamName = "jetstream";
-         String consumerGroup = "filter-group";
-         String bloomFilterName = "filter-dedup-bf";
-
-         redisStreamService.createConsumerGroup(streamName, consumerGroup);
-         bloomFilterService.createBloomFilter(bloomFilterName);
-
-         int numConsumers = 4;
-
-         ExecutorService executorService = Executors.newFixedThreadPool(numConsumers);
-         for (int i = 0; i < numConsumers; i++) {
-            final String consumerName = "consumer-" + i;
-            executorService.submit(() -> consumeStream(
-                    streamName,
-                    consumerGroup,
-                    consumerName,
-                    bloomFilterName,
-                    streamEventRepository,
-                    redisStreamService,
-                    bloomFilterService,
-                    contentFilterService
-            ));
-         }
-
-
-         // Add shutdown hook to close resources
-         Runtime.getRuntime().addShutdownHook(new Thread(contentFilterService::close));        };
-   }
-
-
-   private void consumeStream(
-           String streamName,
-           String consumerGroup,
-           String consumer,
-           String bloomFilterName,
-           StreamEventRepository streamEventRepository,
-           RedisStreamService redisStreamService,
-           BloomFilterService bloomFilterService,
-           ContentFilterService contentFilterService
-   ) {
-      while (!Thread.currentThread().isInterrupted()) {
-         List<Map.Entry<String, List<StreamEntry>>> entries = redisStreamService.readFromStream(
-                 streamName, consumerGroup, consumer, 5);
-
-         for (Map.Entry<String, List<StreamEntry>> streamEntries : entries) {
-            for (StreamEntry entry : streamEntries.getValue()) {
-               StreamEvent event = StreamEvent.fromStreamEntry(entry);
-
-               // Process the event through our pipeline
-               if (processEvent(
-                       event,
-                       bloomFilterName,
-                       bloomFilterService,
-                       contentFilterService
-               )) {
-                  logger.info("Filtered event: {}", event.getUri());
-                  // Store the filtered event
-                  streamEventRepository.save(event);
-                  // Add to filtered stream
-                  redisStreamService.addToStream("filtered-events", event.toMap());
-               }
-
-               // Acknowledge the message
-               redisStreamService.acknowledgeMessage(streamName, consumerGroup, entry);
-               // Add to bloom filter for deduplication
-
-               bloomFilterService.addToBloomFilter(bloomFilterName, event.getUri());
-            }
-         }
-      }
-   }
-
-   private boolean processEvent(
-           StreamEvent event,
-           String bloomFilterName,
-           BloomFilterService bloomFilterService,
-           ContentFilterService contentFilterService
-   ) {
-      // Skip if already processed (deduplication)
-      if (bloomFilterService.isInBloomFilter(bloomFilterName, event.getUri())) {
-         logger.info("Event already processed: {}", event.getUri());
-         return false;
-      }
-
-      // Skip if text is empty or operation is delete
-      if (event.getText() == null || event.getText().isBlank() || "delete".equals(event.getOperation())) {
-         return false;
-      }
-
-      // Filter based on content
-      if (!contentFilterService.isPoliticsRelated(event.getText())) {
-         return false;
-      }
-
-      logger.info("Storing event: {}", event.getUri());
-      return true;
-   }
+   return entries != null ? entries : Collections.emptyList();
 }
 ```
 

@@ -1,6 +1,7 @@
 package com.redis.filteringapp;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.redis.core.RedisHash;
 import redis.clients.jedis.resps.StreamEntry;
 import java.util.Arrays;
@@ -23,9 +24,12 @@ public class StreamEvent {
     private String rootUri;
     private List<String> langs;
 
+    @Transient
+    private String redisStreamEntryId;
+
     public StreamEvent(String id, String did, String rkey, String text, Long timeUs,
                       String operation, String uri, String parentUri, 
-                      String rootUri, List<String> langs) {
+                      String rootUri, List<String> langs, String redisStreamEntryId) {
         this.id = id;
         this.did = did;
         this.rkey = rkey;
@@ -36,6 +40,9 @@ public class StreamEvent {
         this.parentUri = parentUri;
         this.rootUri = rootUri;
         this.langs = langs;
+
+
+        this.redisStreamEntryId = redisStreamEntryId;
     }
 
     public static StreamEvent fromStreamEntry(StreamEntry entry) {
@@ -56,7 +63,8 @@ public class StreamEvent {
                 fields.getOrDefault("uri", ""),
                 fields.getOrDefault("parentUri", ""),
                 fields.getOrDefault("rootUri", ""),
-                langs
+                langs,
+                entry.getID().toString()
         );
     }
 
@@ -147,5 +155,13 @@ public class StreamEvent {
 
     public void setLangs(List<String> langs) {
         this.langs = langs;
+    }
+
+    public void setRedisStreamEntryId(String redisStreamEntryId) {
+        this.redisStreamEntryId = redisStreamEntryId;
+    }
+
+    public String getRedisStreamEntryId() {
+        return redisStreamEntryId;
     }
 }

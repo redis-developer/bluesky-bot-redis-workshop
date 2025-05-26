@@ -1,5 +1,7 @@
 package com.redis.filteringapp;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.StreamEntryID;
@@ -15,6 +17,8 @@ import java.util.Map;
 
 @Service
 public class RedisStreamService {
+
+    private final static Logger logger = LoggerFactory.getLogger(RedisStreamService.class);
 
     private final JedisPooled jedisPooled;
 
@@ -36,31 +40,20 @@ public class RedisStreamService {
     public void acknowledgeMessage(
             String streamName,
             String consumerGroup,
-            StreamEntry entry) {
-        jedisPooled.xack(streamName, consumerGroup, entry.getID());
+            String streamEntryId) {
+        jedisPooled.xack(streamName, consumerGroup, new StreamEntryID(streamEntryId));
     }
 
     public void createConsumerGroup(String streamName, String consumerGroupName) {
-        try {
-            jedisPooled.xgroupCreate(streamName, consumerGroupName, new StreamEntryID("0-0"), true);
-        } catch (JedisDataException e) {
-            System.out.println("Group already exists");
-        }
+        // Implement the function to invoke XGROUP CREATE command
     }
 
     public List<Map.Entry<String, List<StreamEntry>>> readFromStream(
-            String streamName, String consumerGroup, String consumer, int count) {
-
-        Map<String, StreamEntryID> streams = new HashMap<>();
-        streams.put(streamName, StreamEntryID.XREADGROUP_UNDELIVERED_ENTRY);
-
-        List<Map.Entry<String, List<StreamEntry>>> entries = jedisPooled.xreadGroup(
-                consumerGroup,
-                consumer,
-                XReadGroupParams.xReadGroupParams().count(count),
-                streams
-        );
-
-        return entries != null ? entries : Collections.emptyList();
+            String streamName,
+            String consumerGroup,
+            String consumer,
+            int count) {
+        // Implement the function to invoke XREADGROUP command
+        return null;
     }
 }
