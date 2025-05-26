@@ -4,6 +4,7 @@ import com.redis.om.spring.ops.pds.TopKOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import redis.clients.jedis.exceptions.JedisDataException;
 
 import java.util.List;
 
@@ -17,6 +18,11 @@ public class TopKService {
     }
 
     public List<String> topK(String topKName) {
-        return opsForTopK.list(topKName);
+        try {
+            return opsForTopK.list(topKName);
+        } catch (JedisDataException e) {
+            logger.error(e.getMessage());
+            return List.of();
+        }
     }
 }

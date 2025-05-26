@@ -1,9 +1,6 @@
 package com.redis.dataanalysisapp;
 
-import com.redis.om.spring.annotations.Indexed;
-import com.redis.om.spring.annotations.IndexingOptions;
-import com.redis.om.spring.annotations.VectorIndexed;
-import com.redis.om.spring.annotations.Vectorize;
+import com.redis.om.spring.annotations.*;
 import com.redis.om.spring.indexing.DistanceMetric;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;
@@ -31,21 +28,38 @@ public class StreamEvent {
     @VectorIndexed(distanceMetric = DistanceMetric.COSINE, dimension = 384)
     private byte[] textEmbedding;
 
-    @Indexed
+    @NumericIndexed
     private Long timeUs;
     private String operation;
     private String uri;
     private String parentUri;
     private String rootUri;
 
-    @Indexed
+    @TagIndexed
     private List<String> langs;
     
-    @Indexed
+    @TagIndexed
     private List<String> topics;
 
     @Transient
     private String redisStreamEntryId;
+
+    public StreamEvent() {}
+
+    public StreamEvent(String id, String did, String rkey, String text, Long timeUs,
+                       String operation, String uri, String parentUri,
+                       String rootUri, List<String> langs) {
+        this.id = id;
+        this.did = did;
+        this.rkey = rkey;
+        this.text = text;
+        this.timeUs = timeUs;
+        this.operation = operation;
+        this.uri = uri;
+        this.parentUri = parentUri;
+        this.rootUri = rootUri;
+        this.langs = langs;
+    }
 
     public StreamEvent(String id, String did, String rkey, String text, Long timeUs,
                        String operation, String uri, String parentUri,
@@ -131,5 +145,9 @@ public class StreamEvent {
 
     public String getRedisStreamEntryId() {
         return redisStreamEntryId;
+    }
+
+    public void setRedisStreamEntryId(String redisStreamEntryId) {
+        this.redisStreamEntryId = redisStreamEntryId;
     }
 }

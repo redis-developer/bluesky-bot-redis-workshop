@@ -1,9 +1,6 @@
 package com.redis.topicextractorapp;
 
-import com.redis.om.spring.annotations.Indexed;
-import com.redis.om.spring.annotations.IndexingOptions;
-import com.redis.om.spring.annotations.VectorIndexed;
-import com.redis.om.spring.annotations.Vectorize;
+import com.redis.om.spring.annotations.*;
 import com.redis.om.spring.indexing.DistanceMetric;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;
@@ -31,17 +28,17 @@ public class StreamEvent {
     @VectorIndexed(distanceMetric = DistanceMetric.COSINE, dimension = 384)
     private byte[] textEmbedding;
 
-    @Indexed
+    @NumericIndexed
     private Long timeUs;
     private String operation;
     private String uri;
     private String parentUri;
     private String rootUri;
 
-    @Indexed
+    @TagIndexed
     private List<String> langs;
-    
-    @Indexed
+
+    @TagIndexed
     private List<String> topics;
 
     @Transient

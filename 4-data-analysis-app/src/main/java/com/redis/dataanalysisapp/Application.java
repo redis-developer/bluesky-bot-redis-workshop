@@ -108,7 +108,7 @@ public class Application {
                 semanticRouterService.loadReferences(summarizationRoute, "summarization", 0.55);
             }
 
-            String post = "Hey DevBubble! What's trending today? What are the most mentioned topics in the AI community? What's the latest talk on LangChain and OpenAI APIs?";
+            String post = "Hey DevBubble! What's trending today? What are the most mentioned topics in the AI community? What's the latest talk on Agentic Retrieval?";
             Set<String> matchedRoutes = semanticRouterService.matchRoute(post);
             logger.info("Matched routes: {}", matchedRoutes);
 
