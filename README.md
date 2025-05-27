@@ -584,11 +584,7 @@ public String processUserRequest(String userPost) {
   logger.info("Enriched data: {}", enrichedData.toString());
 
   // Generate a response using the LLM
-  String systemPrompt = "You are a bot that helps users analyse posts about politics. " +
-          "You may be given a data set to help you answer questions. " +
-          "Answer in a max of 300 chars. I MEAN IT. It's a TWEET. " +
-          "Don't write more than 300 chars. Respond in only ONE paragraph. " +
-          "Be as concise as possible";
+  String systemPrompt = "You are a bot that helps users analyse posts about artificial intelligence posts. You may be given a data set to help you answer questions. Answer in a max od 300 chars. I MEAN IT. It's a TWEET. Don't write more than 300 chars. Respond in only ONE paragraph. Be as concise as possible";
 
   List<Message> messages = List.of(
           new SystemMessage(systemPrompt),
