@@ -641,3 +641,73 @@ public void run() {
   }
 }
 ```
+
+## Part 4.1: Semantic Caching
+
+In this part, we'll implement semantic caching to avoid unnecessary LLM calls. We'll use Redis to cache the results of previous queries and return them if a similar query is made again.
+
+### Add necessary annotations to the `SemanticCacheEntry` class
+
+In `SemanticCacheEntry`, we will add the necessary annotations to enable vectorization and indexing for semantic caching.
+
+```java
+@Vectorize(
+      destination = "textEmbedding",
+      provider = EmbeddingProvider.OPENAI,
+      openAiEmbeddingModel = OpenAiApi.EmbeddingModel.TEXT_EMBEDDING_3_LARGE
+)
+private String post;
+
+@VectorIndexed(
+      dimension = 3072,
+      distanceMetric = DistanceMetric.COSINE
+)
+private byte[] postEmbedding;
+```
+
+### Implement the `SemanticCacheService`
+
+In `SemanticCacheService`, we will implement the methods to add entries to the cache and retrieve entries from the cache.
+
+```java
+ public void insertIntoCache(String post, String answer) {
+     SemanticCacheEntry entry = new SemanticCacheEntry(post, answer);
+     repository.save(entry);
+ }
+
+ public String getFromCache(String post) {
+     byte[] embedding = embedder.getTextEmbeddingsAsBytes(List.of(post), SemanticCacheEntry$.POST).getFirst();
+     List<Pair<SemanticCacheEntry, Double>> scores = entityStream.of(SemanticCacheEntry.class)
+             .filter(SemanticCacheEntry$.POST_EMBEDDING.knn(1, embedding))
+             .map(Fields.of(SemanticCacheEntry$._THIS, SemanticCacheEntry$._POST_EMBEDDING_SCORE))
+             .collect(Collectors.toList());
+
+     return scores.stream()
+             .filter(it -> it.getSecond() < 0.2)
+             .findFirst()
+             .map(it -> it.getFirst().getAnswer())
+             .orElse("");
+ }
+```
+
+### Update the `processUserRequest` method in `BlueskyBotRunner`
+
+Replace:
+```java
+String reply = "@" + handle + " " + processUserRequest(cleanedText);
+```
+
+With: 
+
+```java
+ String response = semanticCacheService.getFromCache(cleanedText);
+ if (response.isBlank()) {
+    response = processUserRequest(cleanedText);
+    semanticCacheService.insertIntoCache(cleanedPost, response);
+ }
+ String reply = "@" + handle + " " + response;
+```
+
+### Running the Bot
+
+When running the bot, it will now check the cache for previous responses. If a similar query has been made before, it will return the cached response instead of making an LLM call.

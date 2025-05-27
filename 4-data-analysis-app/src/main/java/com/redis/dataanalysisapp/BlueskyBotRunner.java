@@ -29,6 +29,7 @@ public class BlueskyBotRunner {
     private final TrendingTopicsAnalyzer trendingTopicsAnalyzer;
     private final PostSummarizer postSummarizer;
     private final OpenAiChatModel openAiChatModel;
+    private final SemanticCacheService semanticCacheService;
 
     public BlueskyBotRunner(
             BlueskyAuthService authService,
@@ -36,7 +37,7 @@ public class BlueskyBotRunner {
             PostCreatorService postCreator,
             SemanticRouterService semanticRouterService,
             TrendingTopicsAnalyzer trendingTopicsAnalyzer, PostSummarizer postSummarizer,
-            OpenAiChatModel openAiChatModel) {
+            OpenAiChatModel openAiChatModel, SemanticCacheService semanticCacheService) {
         this.authService = authService;
         this.postSearcher = postSearcher;
         this.postCreator = postCreator;
@@ -44,6 +45,7 @@ public class BlueskyBotRunner {
         this.trendingTopicsAnalyzer = trendingTopicsAnalyzer;
         this.postSummarizer = postSummarizer;
         this.openAiChatModel = openAiChatModel;
+        this.semanticCacheService = semanticCacheService;
     }
 
     @Scheduled(fixedDelay = 30000)
