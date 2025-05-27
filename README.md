@@ -124,7 +124,9 @@ To do so, we will:
     private byte[] textEmbedding;
 ```
 
-2. Then load the references from the JSON file into Redis using the `loadReferences()` method in the `FilteringExampleService` class:
+*Note*: rebuild the module `2-filter-app` so that the Redis OM Spring Metamodel classes are created.
+
+2. Then load the references from the JSON file into Redis using the `loadReferences()` method in the `ContentFilterService` class:
 
 ```java
 void loadReferences() throws IOException {
@@ -236,7 +238,7 @@ And the same events being inserted into the filtered stream:
 ## Part 3: Enriching Events with Topics Extraction
 In this part, we'll enrich the events by extracting topics from its text. We'll use Redis as a Vector Database to store and query the embeddings.
 
-We'll use Ollama to extract topics from each post. Then, we'll store these topics in their respective posts in Redis.
+We'll use Open AI to extract topics from each post. Then, we'll store these topics in their respective posts in Redis.
 
 ### Dropping existing index
 On Redis Insight, run the following command on the workbench:
@@ -263,32 +265,33 @@ public List<String> incrBy(String topKName, Map<String, Long> counters) {
 }
 ```
 
-### Setup a Ollama Chat Model Bean
+### Setup a OpenAI Chat Model Bean
 
 ```java
 @Bean
-public OllamaChatModel chatModel() {
-   OllamaApi ollamaApi = OllamaApi.builder()
-           .baseUrl("http://localhost:11434")
-           .webClientBuilder(WebClient.builder())
-           .restClientBuilder(RestClient.builder())
-           .responseErrorHandler(new DefaultResponseErrorHandler())
+public OpenAiChatModel chatModel() {
+   SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+   factory.setReadTimeout((int) Duration.ofSeconds(60).toMillis());
+
+   OpenAiApi openAiApi = OpenAiApi.builder()
+           .apiKey(System.getenv("OPENAI_API_KEY"))
+           .restClientBuilder(RestClient.builder().requestFactory(factory))
            .build();
 
-   OllamaOptions ollamaOptions = OllamaOptions.builder()
-           .model("deepseek-coder-v2")
+   OpenAiChatOptions options = OpenAiChatOptions.builder()
+           .model("gpt-4o-mini")
            .build();
 
-   return OllamaChatModel.builder()
-           .ollamaApi(ollamaApi)
-           .defaultOptions(ollamaOptions)
+   return OpenAiChatModel.builder()
+           .openAiApi(openAiApi)
+           .defaultOptions(options)
            .build();
 }
 ```
 
 ### Extracting Topics from Posts
 
-In `TopicExtractorService`, we will implement the `extractTopics` method to extract topics from the posts using the Ollama Chat Model.
+In `TopicExtractorService`, we will implement the `extractTopics` method to extract topics from the posts using the OpenAI Chat Model.
 
 ```java
 private List<String> extractTopics(String post) {
@@ -329,7 +332,7 @@ public List<String> processTopics(StreamEvent event) {
 
 ### Updating existing posts with topics
 
-In the main method of the `Application` class, we will read the filtered events from the Redis Stream and process them to extract topics.
+In the `consumeStream()` method of the `Application` class, we will read the filtered events from the Redis Stream and process them to extract topics.
 
 ```java
 Map<String, Long> counts = topics.stream().collect(Collectors.toMap(

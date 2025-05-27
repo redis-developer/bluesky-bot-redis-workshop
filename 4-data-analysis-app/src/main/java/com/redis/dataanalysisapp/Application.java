@@ -44,7 +44,7 @@ public class Application {
         factory.setReadTimeout((int) Duration.ofSeconds(60).toMillis());
 
         OpenAiApi openAiApi = OpenAiApi.builder()
-                .apiKey(System.getenv("OPEN_AI_KEY"))
+                .apiKey(System.getenv("OPENAI_API_KEY"))
                 .restClientBuilder(RestClient.builder().requestFactory(factory))
                 .build();
 
