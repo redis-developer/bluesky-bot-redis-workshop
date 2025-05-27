@@ -21,5 +21,13 @@ public class RedisStreamService {
 
     public void addToStream(String streamName, Map<String, String> hash) {
         // Implement the XADD command to add a new entry to the stream
+        jedisPooled.xadd(
+            streamName,
+            XAddParams.xAddParams()
+                .id(StreamEntryID.NEW_ENTRY)
+                .maxLen(1_000_000)
+                .exactTrimming(),
+            hash
+        );
     }
 }
