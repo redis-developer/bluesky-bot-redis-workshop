@@ -31,7 +31,22 @@ public class ContentFilterService {
     }
 
     void loadReferences() throws IOException {
-        // Implement the function to load references from the JSON file
+      if (repository.count() > 0) {
+        logger.info("Filtering examples already loaded, skipping.");
+        return;
+      }
+
+      ObjectMapper objectMapper = new ObjectMapper();
+
+      Resource resource = new ClassPathResource("filtering_examples.json");
+
+      List<String> references = objectMapper.readValue(
+          resource.getInputStream(), new TypeReference<List<String>>() {}
+      );
+
+      references.stream()
+          .map(FilteringExample::new)
+          .forEach(repository::save);
     }
 
     public List<Pair<StreamEvent, Boolean>> isAiRelated(List<StreamEvent> events) {
