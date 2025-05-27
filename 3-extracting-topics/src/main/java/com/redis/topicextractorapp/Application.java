@@ -9,16 +9,21 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.ai.ollama.api.OllamaApi;
 import org.springframework.ai.ollama.api.OllamaOptions;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.DefaultResponseErrorHandler;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.reactive.function.client.WebClient;
 import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.resps.StreamEntry;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -46,9 +51,23 @@ public class Application {
     }
 
     @Bean
-    public OllamaChatModel chatModel() {
-        // Implement OllamaChatModel bean with appropriate configuration
-        return null;
+    public OpenAiChatModel chatModel() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setReadTimeout((int) Duration.ofSeconds(60).toMillis());
+
+        OpenAiApi openAiApi = OpenAiApi.builder()
+            .apiKey(System.getenv("OPENAI_API_KEY"))
+            .restClientBuilder(RestClient.builder().requestFactory(factory))
+            .build();
+
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+            .model("gpt-4o-mini")
+            .build();
+
+        return OpenAiChatModel.builder()
+            .openAiApi(openAiApi)
+            .defaultOptions(options)
+            .build();
     }
 
     @Bean
@@ -100,6 +119,20 @@ public class Application {
 
                 if (!topics.isEmpty()) {
                     // Implement logic to save topics to their respective posts and to TopK in Redis
+                    Map<String, Long> counts = topics.stream().collect(Collectors.toMap(
+                        topic -> topic,
+                        topic -> 1L, // Initialize count to 1 for each topic
+                        Long::sum // In case of duplicates (very unlikely), sum the counts
+                    ));
+
+                    // Create TopK
+                    String topKKeySpace = "topics-topk:";
+                    String topKKey = topKKeySpace + LocalDateTime.now().withMinute(0).withSecond(0).withNano(0);
+                    topKService.create(topKKey);
+                    topKService.incrBy(topKKey, counts);
+
+                    event.setTopics(topics);
+                    streamEventRepository.updateField(event, StreamEvent$.TOPICS, topics);
                 }
 
                 // Acknowledge the message
