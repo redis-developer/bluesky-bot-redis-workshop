@@ -30,7 +30,14 @@ public class SemanticRouterService {
     }
 
     void loadReferences(List<String> references, String route, double maxThreshold) {
-        // Implement loading of references into the repository
+        references.stream()
+            .map(reference -> {
+                Routing routing = new Routing();
+                routing.setRoute(route);
+                routing.setMinThreshold(maxThreshold);
+                routing.setText(reference);
+                return routing;
+            }).forEach(repository::save);
     }
 
     private byte[] createEmbedding(String text) {
