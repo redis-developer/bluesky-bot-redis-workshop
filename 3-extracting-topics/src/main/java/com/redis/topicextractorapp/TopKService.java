@@ -19,11 +19,14 @@ public class TopKService {
     }
 
     public void create(String name) {
-        // Implementation of create method
+        try {
+            opsForTopK.createFilter(name, 15, 3000, 10, 0.9);
+        } catch(JedisDataException e) {
+            logger.info("TopK {} already exists", name);
+        }
     }
 
     public List<String> incrBy(String topKName, Map<String, Long> counters) {
-        // Implementation of incrBy method
-        return null;
+        return opsForTopK.incrementBy(topKName, counters);
     }
 }
