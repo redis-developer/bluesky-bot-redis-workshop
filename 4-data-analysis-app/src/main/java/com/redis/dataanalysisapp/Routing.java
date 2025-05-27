@@ -16,9 +16,18 @@ public class Routing {
     private String id;
 
     // Annotation to indicate that this field should be vectorized using OpenAI's embedding model
+    @Vectorize(
+        destination = "textEmbedding",
+        provider = EmbeddingProvider.OPENAI,
+        openAiEmbeddingModel = OpenAiApi.EmbeddingModel.TEXT_EMBEDDING_3_LARGE
+    )
     private String text;
 
     // Annotation to indicate that this field should be indexed as a vector
+    @VectorIndexed(
+        distanceMetric = DistanceMetric.COSINE,
+        dimension = 3072
+    )
     private byte[] textEmbedding;
 
     private String route;
