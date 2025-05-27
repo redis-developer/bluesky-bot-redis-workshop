@@ -47,7 +47,12 @@ public class SemanticRouterService {
 
     private Pair<Routing, Double> vectorSimilaritySearch(byte[] embedding) {
         // Implement vector similarity search logic
-        return null;
+        return entityStream.of(Routing.class)
+            .filter(Routing$.TEXT_EMBEDDING.knn(1, embedding))
+            .sorted(Routing$._TEXT_EMBEDDING_SCORE)
+            .map(Fields.of(Routing$._THIS, Routing$._TEXT_EMBEDDING_SCORE))
+            .collect(Collectors.toList())
+            .getFirst();
     }
 
     public Set<String> matchRoute(String post) {
