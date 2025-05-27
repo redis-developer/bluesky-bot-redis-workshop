@@ -17,6 +17,7 @@ public class TrendingTopicsAnalyzer {
 
     public List<String> getTrendingTopics() {
         // Implement logic to retrieve trending topics
-        return null;
+        String currentMinute = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0).toString();
+        return topKService.topK("topics-topk:" + currentMinute);
     }
 }
