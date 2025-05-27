@@ -569,6 +569,11 @@ In `BlueskyBotRunner` implement the function to process user posts. This functio
 public String processUserRequest(String userPost) {
   Set<String> matchedRoutes = semanticRouterService.matchRoute(userPost);
   logger.info("Matched routes: {}", matchedRoutes);
+  
+  if (matchedRoutes.isEmpty()) {
+      logger.warn("No matching routes found for user post: {}", userPost);
+      return "Sorry, I couldn't find any relevant information for your query. Please try asking me to talk about trending topics or summarizing posts..";
+  }
 
   // Get data based on the matched routes
   List<String> enrichedData = matchedRoutes.stream()
