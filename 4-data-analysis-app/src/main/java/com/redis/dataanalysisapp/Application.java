@@ -12,16 +12,17 @@ import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.client.RestClient;
 import redis.clients.jedis.JedisPooled;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Stream;
 
+@EnableScheduling
 @EnableRedisEnhancedRepositories
 @SpringBootApplication
 public class Application {
@@ -63,10 +64,13 @@ public class Application {
     }
 
     @Bean
+    public RestTemplateBuilder restTemplateBuilder() {
+        return new RestTemplateBuilder();
+    }
+
+    @Bean
     public CommandLineRunner runFilteringPipeline(
-            SemanticRouterService semanticRouterService,
-            PostSummarizer postSummarizer,
-            TrendingTopicsAnalyzer trendingTopicsAnalyzer
+            SemanticRouterService semanticRouterService
     ) {
         return args -> {
             if (!semanticRouterService.areReferencesLoaded()) {
@@ -107,22 +111,6 @@ public class Application {
                 );
                 semanticRouterService.loadReferences(summarizationRoute, "summarization", 0.55);
             }
-
-            String post = "Hey DevBubble! What's trending today? What are the most mentioned topics in the AI community? What's the latest talk on Agentic Retrieval?";
-            Set<String> matchedRoutes = semanticRouterService.matchRoute(post);
-            logger.info("Matched routes: {}", matchedRoutes);
-
-            List<String> enrichedData = matchedRoutes.stream()
-                    .flatMap(route -> switch (route) {
-                        case "trending_topics" -> trendingTopicsAnalyzer.getTrendingTopics().stream();
-                        case "summarization" -> postSummarizer.summarizePosts(post).stream();
-                        default -> {
-                            logger.warn("No handler for route: {}", route);
-                            yield Stream.of("");
-                        }
-                    }).toList();
-
-            logger.info("Enriched data: {}", enrichedData.toString());
         };
     }
 }
