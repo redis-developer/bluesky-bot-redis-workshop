@@ -74,7 +74,7 @@ public class ContentFilterService {
 
     private List<byte[]> createEmbeddings(List<String> texts) {
         // Use the embedder to create embeddings for the provided texts
-        return null;
+        return embedder.getTextEmbeddingsAsBytes(texts, FilteringExample$.TEXT);
     }
 
     private boolean vectorSimilaritySearch(byte[] embedding) {
