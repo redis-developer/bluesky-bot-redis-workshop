@@ -58,8 +58,29 @@ public class SemanticRouterService {
     public Set<String> matchRoute(String post) {
         List<String> clauses = breakSentenceIntoClauses(post);
 
-        // Implement logic to match the route based on the clauses
-        return null;
+        return clauses.stream()
+            .flatMap(clause -> {
+                byte[] embedding = createEmbedding(clause);
+                var result = vectorSimilaritySearch(embedding);
+
+                Routing routing = result.getFirst();
+                Double score = result.getSecond();
+
+                String route = routing.getRoute();
+                double maxThreshold = routing.getMinThreshold();
+
+                System.out.println("Clause: " + clause);
+                System.out.println("Route: " + route);
+                System.out.println("Score: " + score);
+                System.out.println("Max Threshold: " + maxThreshold);
+                System.out.println();
+
+                if (score < maxThreshold) {
+                    return Stream.of(route);
+                } else {
+                    return Stream.empty();
+                }
+            }).collect(Collectors.toSet());
     }
 
     private List<String> breakSentenceIntoClauses(String sentence) {
