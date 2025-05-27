@@ -12,9 +12,18 @@ public class FilteringExample {
     private String id;
 
     // Implement the Vectorize annotation to specify the model to use for embedding
+    @Vectorize(
+        destination = "textEmbedding",
+        transformersModel = "https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/onnx/model.onnx?download=true",
+        transformersTokenizer = "https://huggingface.co/sentence-transformers/all-mpnet-base-v2/raw/main/tokenizer.json"
+    )
     private String text;
 
     // Use VectorIndexed to enable vector indexing on the textEmbedding field
+    @VectorIndexed(
+        distanceMetric = DistanceMetric.COSINE,
+        dimension = 768
+    )
     private byte[] textEmbedding;
 
     public FilteringExample() {
