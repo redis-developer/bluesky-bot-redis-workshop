@@ -42,7 +42,7 @@ public class SemanticRouterService {
 
     private byte[] createEmbedding(String text) {
         // Implement embedding creation logic
-        return null;
+        return embedder.getTextEmbeddingsAsBytes(List.of(text), Routing$.TEXT).getFirst();
     }
 
     private Pair<Routing, Double> vectorSimilaritySearch(byte[] embedding) {
