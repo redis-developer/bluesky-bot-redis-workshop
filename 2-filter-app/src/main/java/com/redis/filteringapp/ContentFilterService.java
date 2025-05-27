@@ -79,6 +79,12 @@ public class ContentFilterService {
 
     private boolean vectorSimilaritySearch(byte[] embedding) {
         // Implement the function to perform vector similarity search
-        return false;
+        List<com.redis.om.spring.tuple.Pair<FilteringExample, Double>> scores = entityStream.of(FilteringExample.class)
+            .filter(FilteringExample$.TEXT_EMBEDDING.knn(1, embedding))
+            .sorted(FilteringExample$._TEXT_EMBEDDING_SCORE)
+            .map(Fields.of(FilteringExample$._THIS, FilteringExample$._TEXT_EMBEDDING_SCORE))
+            .collect(Collectors.toList());
+
+        return scores.stream().anyMatch(score -> score.getSecond() < 0.53);
     }
 }
