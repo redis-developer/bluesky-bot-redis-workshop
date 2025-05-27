@@ -30,11 +30,7 @@ To follow this workshop, you'll need:
    ```bash
    docker exec -it redis-database redis-cli ping
    ```
-5. Start Ollama with the Deepseek Coder model:
-   ```bash
-   ollama run deepseek-coder-v2
-   ```
-6. Download Redis Insight from https://redis.io/docs/latest/operate/redisinsight/install/ and connect it to your Redis instance running on `localhost:6379`.
+5. Download Redis Insight from https://redis.io/docs/latest/operate/redisinsight/install/ and connect it to your Redis instance running on `localhost:6379`.
 
 ## Workshop Overview
 
