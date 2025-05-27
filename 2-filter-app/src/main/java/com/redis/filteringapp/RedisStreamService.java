@@ -46,6 +46,16 @@ public class RedisStreamService {
 
     public void createConsumerGroup(String streamName, String consumerGroupName) {
         // Implement the function to invoke XGROUP CREATE command
+        try {
+            jedisPooled.xgroupCreate(
+                streamName,
+                consumerGroupName,
+                new StreamEntryID("0-0"),
+                true
+            );
+        } catch (JedisDataException e) {
+            logger.info("Group already exists");
+        }
     }
 
     public List<Map.Entry<String, List<StreamEntry>>> readFromStream(
