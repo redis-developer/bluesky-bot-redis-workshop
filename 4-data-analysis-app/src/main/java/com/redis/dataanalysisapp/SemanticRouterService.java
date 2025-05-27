@@ -30,55 +30,24 @@ public class SemanticRouterService {
     }
 
     void loadReferences(List<String> references, String route, double maxThreshold) {
-        references.stream()
-                .map(reference -> {
-                    Routing routing = new Routing();
-                    routing.setRoute(route);
-                    routing.setMinThreshold(maxThreshold);
-                    routing.setText(reference);
-                    return routing;
-                }).forEach(repository::save);
+        // Implement loading of references into the repository
     }
 
     private byte[] createEmbedding(String text) {
-        return embedder.getTextEmbeddingsAsBytes(List.of(text), Routing$.TEXT).getFirst();
+        // Implement embedding creation logic
+        return null;
     }
 
     private Pair<Routing, Double> vectorSimilaritySearch(byte[] embedding) {
-        return entityStream.of(Routing.class)
-                .filter(Routing$.TEXT_EMBEDDING.knn(1, embedding))
-                .sorted(Routing$._TEXT_EMBEDDING_SCORE)
-                .map(Fields.of(Routing$._THIS, Routing$._TEXT_EMBEDDING_SCORE))
-                .collect(Collectors.toList())
-                .getFirst();
+        // Implement vector similarity search logic
+        return null;
     }
 
     public Set<String> matchRoute(String post) {
         List<String> clauses = breakSentenceIntoClauses(post);
 
-        return clauses.stream()
-            .flatMap(clause -> {
-                byte[] embedding = createEmbedding(clause);
-                var result = vectorSimilaritySearch(embedding);
-
-                Routing routing = result.getFirst();
-                Double score = result.getSecond();
-
-                String route = routing.getRoute();
-                double maxThreshold = routing.getMinThreshold();
-
-                System.out.println("Clause: " + clause);
-                System.out.println("Route: " + route);
-                System.out.println("Score: " + score);
-                System.out.println("Max Threshold: " + maxThreshold);
-                System.out.println();
-
-                if (score < maxThreshold) {
-                    return Stream.of(route);
-                } else {
-                    return Stream.empty();
-                }
-            }).collect(Collectors.toSet());
+        // Implement logic to match the route based on the clauses
+        return null;
     }
 
     private List<String> breakSentenceIntoClauses(String sentence) {

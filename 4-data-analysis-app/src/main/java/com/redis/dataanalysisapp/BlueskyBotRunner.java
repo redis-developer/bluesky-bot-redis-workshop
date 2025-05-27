@@ -7,6 +7,7 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +18,8 @@ import java.util.stream.Stream;
 @Component
 public class BlueskyBotRunner {
 
-    private static final String BOT_REPO = "did:plc:qdwb7czl4gdbu5go25dza3vo";
+    @Value("${bluesky.did}")
+    private String did;
 
     private static final Logger logger = LoggerFactory.getLogger(BlueskyBotRunner.class);
     private final BlueskyAuthService authService;
@@ -45,73 +47,16 @@ public class BlueskyBotRunner {
     }
 
     @Scheduled(fixedDelay = 30000)
-    public void runBot(
-    ) {
+    public void runBot() {
         run();
     }
 
     public void run() {
-        try {
-            String accessToken = authService.getAccessToken();
-            List<PostSearcherService.Post> posts = postSearcher.searchPosts(
-                    "@devbubble.bsky.social", 15, accessToken
-            );
-
-            for (PostSearcherService.Post post : posts) {
-                String originalText = post.getRecord().getText();
-                String cleanedText = originalText.replace("@devbubble.bsky.social", "").trim();
-                String handle = post.getAuthor().getHandle();
-
-                String reply = "@" + handle + " " + processUserRequest(cleanedText);
-                List<String> chunks = postCreator.splitIntoChunks(reply, 300);
-
-                for (String chunk : chunks) {
-                    postCreator.createPost(
-                            accessToken,
-                            BOT_REPO,
-                            chunk,
-                            post.getUri(),
-                            post.getCid()
-                    );
-                }
-            }
-
-        } catch (Exception e) {
-            System.out.println("❌ Error running bot: " + e.getMessage());
-        }
+        // Implement the logic to run the bot
     }
 
     public String processUserRequest(String userPost) {
-        Set<String> matchedRoutes = semanticRouterService.matchRoute(userPost);
-        logger.info("Matched routes: {}", matchedRoutes);
-
-        // Get data based on the matched routes
-        List<String> enrichedData = matchedRoutes.stream()
-                .flatMap(route -> switch (route) {
-                    case "trending_topics" -> trendingTopicsAnalyzer.getTrendingTopics().stream();
-                    case "summarization" -> postSummarizer.summarizePosts(userPost).stream();
-                    default -> {
-                        logger.warn("No handler for route: {}", route);
-                        yield Stream.of("");
-                    }
-                }).toList();
-
-        logger.info("Enriched data: {}", enrichedData.toString());
-
-        // Generate a response using the LLM
-        String systemPrompt = "You are a bot that helps users analyse posts about politics. " +
-                "You may be given a data set to help you answer questions. " +
-                "Answer in a max of 300 chars. I MEAN IT. It's a TWEET. " +
-                "Don't write more than 300 chars. Respond in only ONE paragraph. " +
-                "Be as concise as possible";
-
-        List<Message> messages = List.of(
-                new SystemMessage(systemPrompt),
-                new SystemMessage("Enriching data: " + enrichedData),
-                new UserMessage("User query: " + userPost)
-        );
-
-        Prompt prompt = new Prompt(messages);
-        return openAiChatModel.call(prompt).getResult().getOutput().getText();
+        // Implement the logic to process the user request
+        return null;
     }
 }

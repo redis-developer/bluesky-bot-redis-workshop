@@ -378,6 +378,266 @@ In this part, we'll build a question-answering system that can analyze the enric
 1. Semantic routing to understand what the user is asking
 2. Trending topics analysis to identify popular topics
 3. Summarization to provide concise answers about specific topics
+4. Implementing a bot that interacts with users on Bluesky
 
 
+### Semantic Routing
 
+In order to understand what the user is asking, we will use semantic routing. This involves analyzing the user's query and determining which topics are relevant to the query.
+
+#### Adding Vectorization and Indexing annotations to `Routing` class:
+
+In `Routing` class, we will add the necessary annotations to enable vectorization and indexing for semantic routing.
+
+```java
+ @Vectorize(
+         destination = "textEmbedding",
+         provider = EmbeddingProvider.OPENAI,
+         openAiEmbeddingModel = OpenAiApi.EmbeddingModel.TEXT_EMBEDDING_3_LARGE
+ )
+ private String text;
+
+ @VectorIndexed(
+         distanceMetric = DistanceMetric.COSINE,
+         dimension = 3072
+ )
+ private byte[] textEmbedding;
+```
+
+#### Creating function to add routes and references to Redis
+
+In `SemanticRoutingService`, we will implement the `loadReferences` method to load the references into Redis. This method will create a `Routing` object for each reference and save it in Redis.
+
+```java
+void loadReferences(List<String> references, String route, double maxThreshold) {
+  references.stream()
+          .map(reference -> {
+              Routing routing = new Routing();
+              routing.setRoute(route);
+              routing.setMinThreshold(maxThreshold);
+              routing.setText(reference);
+              return routing;
+          }).forEach(repository::save);
+}
+```
+
+#### Load references into Redis
+
+In the `main` method of the `Application` class, we will load the references into Redis. This will allow us to perform semantic routing based on the user's query.
+
+```java
+if (!semanticRouterService.areReferencesLoaded()) {
+    List<String> trendingTopicsRoute = List.of(
+            "What are the most mentioned topics?",
+            "What's trending right now?",
+            "What’s hot in the network",
+            "Top topics?",
+            "What are the most discussed topics?",
+            "What are the most popular topics?",
+            "What are the most talked about topics?",
+            "What are the most mentioned topics in the AI community?"
+    );
+    semanticRouterService.loadReferences(trendingTopicsRoute, "trending_topics", 0.2);
+
+    List<String> summarizationRoute = List.of(
+            "What are people saying about {topics}?",
+            "What’s the buzz around {topics}?",
+            "Any chatter about {topics}?",
+            "What are folks talking about regarding {topics}?",
+            "What’s being said about {topics} lately?",
+            "What have people been posting about {topics}?",
+            "What's trending in conversations about {topics}?",
+            "What’s the latest talk on {topics}?",
+            "Any recent posts about {topics}?",
+            "What's the sentiment around {topics}?",
+            "What are people saying about {topic1} and {topic2}?",
+            "What are folks talking about when it comes to {topic1}, {topic2}, or both?",
+            "What’s being said about {topic1}, {topic2}, and others?",
+            "Is there any discussion around {topic1} and {topic2}?",
+            "How are people reacting to both {topic1} and {topic2}?",
+            "What’s the conversation like around {topic1}, {topic2}, or related topics?",
+            "Are {topic1} and {topic2} being discussed together?",
+            "Any posts comparing {topic1} and {topic2}?",
+            "What's trending when it comes to {topic1} and {topic2}?",
+            "What are people saying about the relationship between {topic1} and {topic2}?",
+            "What’s the latest discussion on {topic1} and {topic2}?"
+    );
+    semanticRouterService.loadReferences(summarizationRoute, "summarization", 0.55);
+}
+```
+
+#### Create a function to vectorize user posts
+
+In `SemanticRoutingService`, we will implement the `createEmbedding` method to vectorize the user's post.
+
+```java
+private byte[] createEmbedding(String text) {
+  return embedder.getTextEmbeddingsAsBytes(List.of(text), Routing$.TEXT).getFirst();
+}
+```
+
+#### Create a function to perform vector similarity search
+
+In `SemanticRoutingService`, we will implement the `vectorSimilaritySearch` method to perform vector similarity search against the references stored in Redis.
+
+```java
+return entityStream.of(Routing.class)
+       .filter(Routing$.TEXT_EMBEDDING.knn(1, embedding))
+       .sorted(Routing$._TEXT_EMBEDDING_SCORE)
+       .map(Fields.of(Routing$._THIS, Routing$._TEXT_EMBEDDING_SCORE))
+       .collect(Collectors.toList())
+       .getFirst();
+```
+
+#### Create a function to route the user query
+
+In `SemanticRoutingService`, we will implement the `matchRoutes` method to match the user's query against the routes stored in Redis. This method will return a set of matching routes.
+
+```java
+ public Set<String> matchRoute(String post) {
+     List<String> clauses = breakSentenceIntoClauses(post);
+
+     return clauses.stream()
+         .flatMap(clause -> {
+             byte[] embedding = createEmbedding(clause);
+             var result = vectorSimilaritySearch(embedding);
+
+             Routing routing = result.getFirst();
+             Double score = result.getSecond();
+
+             String route = routing.getRoute();
+             double maxThreshold = routing.getMinThreshold();
+
+             System.out.println("Clause: " + clause);
+             System.out.println("Route: " + route);
+             System.out.println("Score: " + score);
+             System.out.println("Max Threshold: " + maxThreshold);
+             System.out.println();
+
+             if (score < maxThreshold) {
+                 return Stream.of(route);
+             } else {
+                 return Stream.empty();
+             }
+         }).collect(Collectors.toSet());
+ }
+```
+
+### Implementing the functions to be called from the routes
+
+##### Trending Topics
+
+In `TrendingTopicsService`, we will implement the `getTrendingTopics` method to retrieve the trending topics from Redis. This method will use the TopK service to get the most mentioned topics.
+
+```java
+String currentMinute = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0).toString();
+return topKService.topK("topics-topk:" + currentMinute);
+```
+
+##### Summarization
+
+In `SummarizationService`, we will implement the `summarizeTopics` method to summarize the topics mentioned in the user's query. This method will use the Ollama Chat Model to generate a summary based on the topics.
+
+```java
+    public List<String> summarizePosts(String userQuery) {
+        // Extract topics from the user query
+        List<String> queryTopics = topicExtractionService.extractTopics(userQuery);
+        logger.info("Query topics: {}", queryTopics);
+
+        // For each topic, search for posts in Redis
+        List<EqualPredicate<StreamEvent, List<String>>> predicates = queryTopics.stream().map(
+                topic -> StreamEvent$.TOPICS.eq(List.of(topic))
+        ).toList();
+
+        Predicate<List<String>> finalPredicate = predicates.getFirst();
+
+        for (int i = 1; i < predicates.size(); i++) {
+            finalPredicate = finalPredicate.or(predicates.get(i));
+        }
+        
+        return entityStream.of(StreamEvent.class)
+                .filter(finalPredicate)
+                .map(Fields.of(StreamEvent$._THIS, StreamEvent$._THIS))
+                .collect(Collectors.toList())
+                .stream()
+                .map(pair -> pair.getSecond().getText())
+                .toList();
+    }
+```
+
+#### Putting it all together
+
+In `BlueskyBotRunner` implement the function to process user posts. This function will use the semantic routing service to match the user's query against the routes, retrieve the relevant data, and generate a response using the LLM.
+
+```java
+public String processUserRequest(String userPost) {
+  Set<String> matchedRoutes = semanticRouterService.matchRoute(userPost);
+  logger.info("Matched routes: {}", matchedRoutes);
+
+  // Get data based on the matched routes
+  List<String> enrichedData = matchedRoutes.stream()
+          .flatMap(route -> switch (route) {
+              case "trending_topics" -> trendingTopicsAnalyzer.getTrendingTopics().stream();
+              case "summarization" -> postSummarizer.summarizePosts(userPost).stream();
+              default -> {
+                  logger.warn("No handler for route: {}", route);
+                  yield Stream.of("");
+              }
+          }).toList();
+
+  logger.info("Enriched data: {}", enrichedData.toString());
+
+  // Generate a response using the LLM
+  String systemPrompt = "You are a bot that helps users analyse posts about politics. " +
+          "You may be given a data set to help you answer questions. " +
+          "Answer in a max of 300 chars. I MEAN IT. It's a TWEET. " +
+          "Don't write more than 300 chars. Respond in only ONE paragraph. " +
+          "Be as concise as possible";
+
+  List<Message> messages = List.of(
+          new SystemMessage(systemPrompt),
+          new SystemMessage("Enriching data: " + enrichedData),
+          new UserMessage("User query: " + userPost)
+  );
+
+  Prompt prompt = new Prompt(messages);
+  return openAiChatModel.call(prompt).getResult().getOutput().getText();
+}
+```
+
+#### Implement the function to run the bot
+
+In `BlueskyBotRunner` implement the `run` method to connect to Bluesky, retrieve posts, and respond to user queries.
+
+```java
+public void run() {
+  try {
+      String accessToken = authService.getAccessToken();
+      List<PostSearcherService.Post> posts = postSearcher.searchPosts(
+              "@devbubble.bsky.social", 15, accessToken
+      );
+
+      for (PostSearcherService.Post post : posts) {
+          String originalText = post.getRecord().getText();
+          String cleanedText = originalText.replace("@devbubble.bsky.social", "").trim();
+          String handle = post.getAuthor().getHandle();
+
+          String reply = "@" + handle + " " + processUserRequest(cleanedText);
+          List<String> chunks = postCreator.splitIntoChunks(reply, 300);
+
+          for (String chunk : chunks) {
+              postCreator.createPost(
+                      accessToken,
+                      did,
+                      chunk,
+                      post.getUri(),
+                      post.getCid()
+              );
+          }
+      }
+
+  } catch (Exception e) {
+      System.out.println("❌ Error running bot: " + e.getMessage());
+  }
+}
+```

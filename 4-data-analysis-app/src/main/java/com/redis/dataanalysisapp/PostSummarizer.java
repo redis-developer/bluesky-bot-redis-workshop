@@ -29,32 +29,7 @@ public class PostSummarizer {
     }
 
     public List<String> summarizePosts(String userQuery) {
-        // Get existing topics from Redis
-        Set<String> existingTopics = jedisPooled.smembers("topics");
-
-        // Extract topics from the user query
-        List<String> queryTopics = topicExtractionService.extractTopics(userQuery);
-        logger.info("Query topics: {}", queryTopics);
-
-        // For each topic, search for posts in Redis
-        List<EqualPredicate<StreamEvent, List<String>>> predicates = queryTopics.stream().map(
-                topic -> StreamEvent$.TOPICS.eq(List.of(topic))
-        ).toList();
-
-        Predicate<List<String>> finalPredicate = predicates.getFirst();
-
-        for (int i = 1; i < predicates.size(); i++) {
-            finalPredicate = finalPredicate.or(predicates.get(i));
-        }
-
-
-
-        return entityStream.of(StreamEvent.class)
-                .filter(finalPredicate)
-                .map(Fields.of(StreamEvent$._THIS, StreamEvent$._THIS))
-                .collect(Collectors.toList())
-                .stream()
-                .map(pair -> pair.getSecond().getText())
-                .toList();
+        // Implement logic to summarize posts based on the user query
+        return null;
     }
 }
