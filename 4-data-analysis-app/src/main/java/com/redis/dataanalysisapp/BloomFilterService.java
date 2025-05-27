@@ -1,4 +1,4 @@
-package com.redis.topicextractorapp;
+package com.redis.dataanalysisapp;
 
 import com.redis.om.spring.ops.pds.BloomOperations;
 import org.slf4j.Logger;
@@ -24,10 +24,11 @@ public class BloomFilterService {
     }
 
     public boolean isInBloomFilter(String bloomFilter, String value) {
-        return opsForBloom.exists(bloomFilter, value);
+        // Implement checking if the value is in the bloom filter
+        return false;
     }
 
     public void addToBloomFilter(String bloomFilter, String value) {
-        opsForBloom.add(bloomFilter, value);
+        // Implement adding to the bloom filter
     }
 }

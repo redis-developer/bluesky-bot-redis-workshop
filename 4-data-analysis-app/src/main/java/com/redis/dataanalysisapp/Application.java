@@ -76,4 +76,13 @@ public class Application {
             // Load references if not already loaded
         };
     }
+
+    @Bean
+    public CommandLineRunner createBloomFilter(
+            BloomFilterService bloomFilterService
+    ) {
+        return args -> {
+            //bloomFilterService.createBloomFilter("processed-posts-bf");
+        };
+    }
 }

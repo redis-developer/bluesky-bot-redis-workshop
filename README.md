@@ -614,15 +614,17 @@ public void run() {
       );
 
       for (PostSearcherService.Post post : posts) {
-          String originalText = post.getRecord().getText();
-          String cleanedText = originalText.replace("@devbubble.bsky.social", "").trim();
-          String handle = post.getAuthor().getHandle();
+        // Implement deduplication using Bloom Filter here
 
-          String reply = "@" + handle + " " + processUserRequest(cleanedText);
-          List<String> chunks = postCreator.splitIntoChunks(reply, 300);
+         String originalText = post.getRecord().getText();
+         String cleanedText = originalText.replace("@devbubble.bsky.social", "").trim();
+         String handle = post.getAuthor().getHandle();
 
-          for (String chunk : chunks) {
-              postCreator.createPost(
+         String reply = "@" + handle + " " + processUserRequest(cleanedText);
+         List<String> chunks = postCreator.splitIntoChunks(reply, 300);
+
+         for (String chunk : chunks) {
+             postCreator.createPost(
                       accessToken,
                       did,
                       chunk,
@@ -707,3 +709,56 @@ With:
 ### Running the Bot
 
 When running the bot, it will now check the cache for previous responses. If a similar query has been made before, it will return the cached response instead of making an LLM call.
+
+## Part 4.2: Deduplication with Bloom Filters
+
+For avoiding processing the same post multiple times, we will use a Bloom Filter to deduplicate posts.
+
+### Adding a Bloom Filter Service
+
+In `BloomFilterService`, we will implement the methods to create a Bloom Filter, add to the Bloom Filter, and check if a post is already in the filter.
+
+```java
+ public void createBloomFilter(String name) {
+     try {
+         opsForBloom.createFilter(name, 1_000_000L, 0.01);
+     } catch(JedisDataException e) {
+         logger.info("Bloom filter {} already exists", name);
+     }
+ }
+
+ public boolean isInBloomFilter(String bloomFilter, String value) {
+     return opsForBloom.exists(bloomFilter, value);
+ }
+
+ public void addToBloomFilter(String bloomFilter, String value) {
+     opsForBloom.add(bloomFilter, value);
+ }
+```
+
+### Updating the `run` method in `BlueskyBotRunner`, we will check if a post is already in the Bloom Filter before processing it. If it is already in the filter, we skip processing that post.
+
+```java
+boolean isProcessed = bloomFilterService.isInBloomFilter("processed-posts-bf", post.getUri());
+
+if (isProcessed) {
+    System.out.println("Post already processed: " + post.getUri());
+    continue;
+}
+
+// Add post to Bloom Filter to avoid processing it again
+bloomFilterService.addToBloomFilter("processed-posts-bf", post.getUri());
+```
+
+### Create bloom filter when application starts
+
+```java
+    @Bean
+    public CommandLineRunner createBloomFilter(
+            BloomFilterService bloomFilterService
+    ) {
+        return args -> {
+            bloomFilterService.createBloomFilter("processed-posts-bf");
+        };
+    }
+```
