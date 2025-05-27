@@ -59,11 +59,21 @@ public class RedisStreamService {
     }
 
     public List<Map.Entry<String, List<StreamEntry>>> readFromStream(
-            String streamName,
-            String consumerGroup,
-            String consumer,
-            int count) {
+        String streamName,
+        String consumerGroup,
+        String consumer,
+        int count) {
         // Implement the function to invoke XREADGROUP command
-        return null;
+        Map<String, StreamEntryID> streams = new HashMap<>();
+        streams.put(streamName, StreamEntryID.XREADGROUP_UNDELIVERED_ENTRY);
+
+        List<Map.Entry<String, List<StreamEntry>>> entries = jedisPooled.xreadGroup(
+            consumerGroup,
+            consumer,
+            XReadGroupParams.xReadGroupParams().count(count),
+            streams
+        );
+
+        return entries != null ? entries : Collections.emptyList();
     }
 }
