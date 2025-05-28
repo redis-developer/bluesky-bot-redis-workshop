@@ -23,11 +23,21 @@ public class SemanticCacheService {
     }
 
     public void insertIntoCache(String post, String answer) {
-        // Implement logic to insert a new post and its answer into the cache
+        SemanticCacheEntry entry = new SemanticCacheEntry(post, answer);
+        repository.save(entry);
     }
 
     public String getFromCache(String post) {
-        // implement logic to retrieve an answer from the cache based on the post
-        return null;
+        byte[] embedding = embedder.getTextEmbeddingsAsBytes(List.of(post), SemanticCacheEntry$.POST).getFirst();
+        List<Pair<SemanticCacheEntry, Double>> scores = entityStream.of(SemanticCacheEntry.class)
+            .filter(SemanticCacheEntry$.POST_EMBEDDING.knn(1, embedding))
+            .map(Fields.of(SemanticCacheEntry$._THIS, SemanticCacheEntry$._POST_EMBEDDING_SCORE))
+            .collect(Collectors.toList());
+
+        return scores.stream()
+            .filter(it -> it.getSecond() < 0.2)
+            .findFirst()
+            .map(it -> it.getFirst().getAnswer())
+            .orElse("");
     }
 }

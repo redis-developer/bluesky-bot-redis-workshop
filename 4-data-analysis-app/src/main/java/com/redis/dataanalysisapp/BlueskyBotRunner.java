@@ -69,7 +69,13 @@ public class BlueskyBotRunner {
                 String cleanedText = originalText.replace("@devbubble.bsky.social", "").trim();
                 String handle = post.getAuthor().getHandle();
 
-                String reply = "@" + handle + " " + processUserRequest(cleanedText);
+                String response = semanticCacheService.getFromCache(cleanedText);
+                if (response.isBlank()) {
+                    response = processUserRequest(cleanedText);
+                    semanticCacheService.insertIntoCache(cleanedText, response);
+                }
+                String reply = "@" + handle + " " + response;
+
                 List<String> chunks = postCreator.splitIntoChunks(reply, 300);
 
                 for (String chunk : chunks) {
