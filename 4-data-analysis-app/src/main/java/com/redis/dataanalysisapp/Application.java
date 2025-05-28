@@ -120,7 +120,7 @@ public class Application {
             BloomFilterService bloomFilterService
     ) {
         return args -> {
-            //bloomFilterService.createBloomFilter("processed-posts-bf");
+            bloomFilterService.createBloomFilter("processed-posts-bf");
         };
     }
 }

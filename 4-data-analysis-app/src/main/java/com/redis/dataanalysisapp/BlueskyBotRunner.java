@@ -64,6 +64,15 @@ public class BlueskyBotRunner {
 
             for (PostSearcherService.Post post : posts) {
                 // Implement deduplication using Bloom Filter here
+                boolean isProcessed = bloomFilterService.isInBloomFilter("processed-posts-bf", post.getUri());
+
+                if (isProcessed) {
+                    System.out.println("Post already processed: " + post.getUri());
+                    continue;
+                }
+
+                // Add post to Bloom Filter to avoid processing it again
+                bloomFilterService.addToBloomFilter("processed-posts-bf", post.getUri());
 
                 String originalText = post.getRecord().getText();
                 String cleanedText = originalText.replace("@devbubble.bsky.social", "").trim();

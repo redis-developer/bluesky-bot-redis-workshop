@@ -25,10 +25,11 @@ public class BloomFilterService {
 
     public boolean isInBloomFilter(String bloomFilter, String value) {
         // Implement checking if the value is in the bloom filter
-        return false;
+        return opsForBloom.exists(bloomFilter, value);
     }
 
     public void addToBloomFilter(String bloomFilter, String value) {
         // Implement adding to the bloom filter
+        opsForBloom.add(bloomFilter, value);
     }
 }
