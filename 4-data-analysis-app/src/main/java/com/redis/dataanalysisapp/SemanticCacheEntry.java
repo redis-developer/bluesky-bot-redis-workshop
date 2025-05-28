@@ -14,9 +14,18 @@ public class SemanticCacheEntry {
     private String id;
 
     // Annotation to indicate that this field should be vectorized using OpenAI's embedding model
+    @Vectorize(
+        destination = "textEmbedding",
+        provider = EmbeddingProvider.OPENAI,
+        openAiEmbeddingModel = OpenAiApi.EmbeddingModel.TEXT_EMBEDDING_3_LARGE
+    )
     private String post;
 
     // Annotation to indicate that this field should be indexed as a vector
+    @VectorIndexed(
+        dimension = 3072,
+        distanceMetric = DistanceMetric.COSINE
+    )
     private byte[] postEmbedding;
 
     private String answer;
