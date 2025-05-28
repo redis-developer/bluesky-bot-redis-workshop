@@ -705,7 +705,7 @@ With:
  String response = semanticCacheService.getFromCache(cleanedText);
  if (response.isBlank()) {
     response = processUserRequest(cleanedText);
-    semanticCacheService.insertIntoCache(cleanedPost, response);
+    semanticCacheService.insertIntoCache(cleanedText, response);
  }
  String reply = "@" + handle + " " + response;
 ```
